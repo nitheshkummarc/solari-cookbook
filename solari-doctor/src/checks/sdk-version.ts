@@ -15,13 +15,9 @@
  * an observed hang — observing that is `browser-lifecycle`'s job.
  */
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import type { DoctorContext } from "../context.js";
+import { readSdkInstall, SDK_PACKAGE } from "./sdk-install.js";
 import type { CheckResult, DoctorCheck } from "../types.js";
-
-const PACKAGE = "@solarisdk/browser";
 
 /** Below this, `browser.close()` alone can leave the process hung (F27). */
 const FIXED_IN = "0.1.3";
@@ -54,55 +50,13 @@ export function compareVersions(a: string, b: string): number {
   return left.prerelease ? -1 : 1;
 }
 
-interface ManifestRead {
-  version?: string;
-  problem?: string;
-}
-
-/** Reads the installed manifest, reporting why rather than throwing. */
-function readInstalledVersion(projectRoot: string): ManifestRead {
-  const path = join(projectRoot, "node_modules", "@solarisdk", "browser", "package.json");
-
-  let raw: string;
-  try {
-    raw = readFileSync(path, "utf8");
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    return {
-      problem:
-        code === "ENOENT"
-          ? `${PACKAGE} is not installed under ${projectRoot}`
-          : `${PACKAGE}'s manifest could not be read (${String(code)})`,
-    };
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return { problem: `${PACKAGE}'s manifest is not valid JSON` };
-  }
-
-  // `JSON.parse` accepts `null`, `"a string"` and `[]` as valid documents, so a
-  // manifest that parses is not yet a manifest that has fields.
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { problem: `${PACKAGE}'s manifest is not an object` };
-  }
-
-  const version = (parsed as { version?: unknown }).version;
-  if (typeof version !== "string" || version === "") {
-    return { problem: `${PACKAGE}'s manifest declares no version` };
-  }
-  return { version };
-}
-
 export const sdkVersionCheck: DoctorCheck = {
   id: "sdk-version",
   description: "Compares the installed @solarisdk/browser against 0.1.3",
   costTier: "free",
 
   run(ctx: DoctorContext): Promise<CheckResult> {
-    const { version, problem } = readInstalledVersion(ctx.projectRoot);
+    const { version, problem } = readSdkInstall(ctx.projectRoot);
 
     // Nothing to assess. `warn` rather than `pass`, because "we could not tell"
     // must not read as "you are safe".
@@ -110,10 +64,10 @@ export const sdkVersionCheck: DoctorCheck = {
       return Promise.resolve({
         id: "sdk-version",
         status: "warn",
-        message: problem ?? `${PACKAGE}'s version could not be determined`,
+        message: problem ?? `${SDK_PACKAGE}'s version could not be determined`,
         durationMs: 0,
         remediation:
-          `Install ${PACKAGE} in this project, or run solari-doctor from the ` +
+          `Install ${SDK_PACKAGE} in this project, or run solari-doctor from the ` +
           "project whose environment you want checked.",
         evidence: { projectRoot: ctx.projectRoot, resolved: false },
       });
@@ -125,7 +79,7 @@ export const sdkVersionCheck: DoctorCheck = {
       return Promise.resolve({
         id: "sdk-version",
         status: "warn",
-        message: `${PACKAGE} reports an unrecognised version "${version}"`,
+        message: `${SDK_PACKAGE} reports an unrecognised version "${version}"`,
         durationMs: 0,
         remediation:
           `The installed version could not be compared against ${FIXED_IN}. ` +
@@ -139,10 +93,10 @@ export const sdkVersionCheck: DoctorCheck = {
       return Promise.resolve({
         id: "sdk-version",
         status: "warn",
-        message: `${PACKAGE} ${version} is older than ${FIXED_IN}`,
+        message: `${SDK_PACKAGE} ${version} is older than ${FIXED_IN}`,
         durationMs: 0,
         remediation:
-          `Upgrade to ${PACKAGE} ${FIXED_IN} or later, where the connection-retry ` +
+          `Upgrade to ${SDK_PACKAGE} ${FIXED_IN} or later, where the connection-retry ` +
           "listener is unref'd and browser.close() alone is enough to exit. " +
           "Until then, call await solari.close() in a finally block.",
         issueRef: "solari-cookbook#README-gotcha-1",
@@ -153,7 +107,7 @@ export const sdkVersionCheck: DoctorCheck = {
     return Promise.resolve({
       id: "sdk-version",
       status: "pass",
-      message: `${PACKAGE} ${version} is at or above ${FIXED_IN}`,
+      message: `${SDK_PACKAGE} ${version} is at or above ${FIXED_IN}`,
       durationMs: 0,
       evidence: { sdkVersion: version, fixedIn: FIXED_IN, resolved: true, exposed: false },
     });
