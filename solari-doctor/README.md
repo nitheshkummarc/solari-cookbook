@@ -342,6 +342,15 @@ The evidence is not uniform, so it is not reported as though it were:
 An adversarial pass against the finished tool then found four further defects —
 two of them security — which are fixed and regression-tested.
 
+**And CI itself was a claim that had not been checked.** Four consecutive runs
+had been red on the Node 20 matrix leg — `vitest@5` requires
+`^22.12 || ^24 || >=26`, and `.npmrc` sets `engine-strict`, so `npm ci` could
+never complete there — while the local suite was green. The gate now runs on
+Node 22 and 24, all four legs passing, and a separate job covers the
+`engines.node >= 20` claim against the built output and production dependencies
+only. That job is **not yet passing and its cause is open**; it is reported that
+way rather than removed to make the badge green.
+
 Full evidence, per claim, in
 [docs-public/FINDINGS.md](docs-public/FINDINGS.md).
 
