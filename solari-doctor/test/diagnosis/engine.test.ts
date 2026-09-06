@@ -46,10 +46,7 @@ describe("purity (design.md §4)", () => {
 });
 
 describe("the design.md §4 example: sdk-version + browser-lifecycle", () => {
-  /**
-   * Exhaustive over both checks — 16 combinations. Cheap precisely because the
-   * layer is pure, which is the argument §4 makes for keeping it that way.
-   */
+  // Exhaustive over both checks: 16 combinations.
   it("fires the known-bug rule on exactly one of 16 combinations", () => {
     const fired: Array<[CheckStatus, CheckStatus]> = [];
 
@@ -110,7 +107,7 @@ describe("the design.md §4 example: sdk-version + browser-lifecycle", () => {
     );
 
     expect(known[0]?.confidence).toBe("high");
-    // Honest about not understanding it — F18 established 0.1.3 exits cleanly.
+    // Finding F18 established that 0.1.3 exits cleanly, so the cause is unknown.
     expect(unknown[0]?.confidence).toBe("low");
   });
 
@@ -257,8 +254,8 @@ describe("the real rule set", () => {
   it("reports a leaked sandbox without claiming a billing fact", () => {
     const [diagnosis] = diagnose([result("sandbox-cleanup", "fail")], DIAGNOSIS_RULES);
     expect(diagnosis?.cause).toContain("remained running after close()");
-    // design.md §6.6 locks this: the API proves the resource is running, and
-    // exposes no billing field at all.
+    // design.md §6.6: the API proves the resource is running and exposes no
+    // billing field.
     expect(diagnosis?.remediation).toMatch(/may result in/i);
     expect(diagnosis?.remediation).not.toMatch(/is costing you|definitely billed/i);
   });

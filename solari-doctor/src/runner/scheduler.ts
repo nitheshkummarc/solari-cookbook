@@ -1,22 +1,19 @@
 /**
- * Dependency-aware scheduler — design.md §7.
+ * Dependency-aware scheduler. See design.md §7.
  *
- * Responsibilities, and nothing else:
- *   - order execution by dependency and cost tier
- *   - bound concurrency for checks that create real resources
- *   - turn an unmet dependency into a `skip`, never a silent omission
- *   - turn a check's own thrown error into a `fail`, never a propagated throw
+ * Orders execution by dependency and cost tier, bounds concurrency for checks
+ * that create resources, converts an unmet dependency into a `skip`, and
+ * converts a check's own thrown error into a `fail`.
  *
- * It does not print (design.md §4), does not interpret SDK errors (§8.1 —
- * that is `runner/errors.ts`), and does not correlate results into causes
- * (§4 — that is the diagnosis engine).
+ * Does not print (design.md §4), interpret SDK errors (§8.1, `runner/errors.ts`)
+ * or correlate results (§4, the diagnosis engine).
  */
 
 import type { CheckRegistry } from "../checks/index.js";
 import type { DoctorContext } from "../context.js";
 import type { CheckResult, DoctorCheck } from "../types.js";
 
-/** design.md §7: "a small bounded worker pool (default concurrency: 3)". */
+/** design.md §7. */
 export const DEFAULT_CONCURRENCY = 3;
 
 export interface SchedulerOptions {
@@ -35,12 +32,10 @@ interface Blocked {
 }
 
 /**
- * Detects dependency cycles.
+ * Throws if the dependency graph contains a cycle, naming every check in it.
  *
- * Deferred here from module 3 deliberately: the registry validates identity
- * (ids are unique, dependencies exist), the scheduler validates structure.
- * A cycle can never become ready, so without this the run would either wait
- * forever or silently drop the checks involved.
+ * The registry validates identity; this validates structure. A cycle can never
+ * become ready, so without this the run would hang or drop those checks.
  */
 function assertNoCycles(checks: readonly DoctorCheck[]): void {
   const byId = new Map(checks.map((c) => [c.id, c]));
@@ -74,13 +69,11 @@ function assertNoCycles(checks: readonly DoctorCheck[]): void {
 }
 
 /**
- * Rejects a graph the tier ordering cannot satisfy.
+ * Throws if a `free` check depends on a bounded one.
  *
- * §7 runs all `free` checks before the bounded pool starts. A `free` check that
- * depends on a `cheap` or `expensive` one therefore waits for something that
- * has not been scheduled yet, and the free phase deadlocks. None of the seven
- * locked checks does this, but nothing structurally prevents it — see finding
- * F38.
+ * §7 runs all `free` checks before the bounded pool starts, so such a
+ * dependency could never be satisfied and the free phase would deadlock. None
+ * of the seven locked checks does this (finding F38).
  */
 function assertTierOrdering(checks: readonly DoctorCheck[]): void {
   const tierById = new Map(checks.map((c) => [c.id, c.costTier]));
@@ -109,8 +102,7 @@ function skipResult(check: DoctorCheck, blocked: Blocked): CheckResult {
   return {
     id: check.id,
     status: "skip",
-    // §7: skipped checks are never silently omitted, and the blocking check is
-    // always named — a skip with no reason is indistinguishable from a bug.
+    // §7: skips are never omitted from output, and always name the blocker.
     message: `skipped: ${because}`,
     durationMs: 0,
     evidence: {
@@ -121,14 +113,11 @@ function skipResult(check: DoctorCheck, blocked: Blocked): CheckResult {
 }
 
 /**
- * Runs one check, converting anything it throws into a `fail`.
+ * Runs one check, converting anything it throws into a `fail` result.
  *
- * A check throwing is a defect in that check, but it is not a reason to abort
- * the whole run: the other six checks still have useful things to say. The
- * scheduler therefore never lets a check's exception escape.
- *
- * `durationMs` is measured here rather than trusted from the check, so it means
- * the same thing for every check and a check cannot forget to set it.
+ * A throwing check is a defect in that check, not a reason to abort the run.
+ * `durationMs` is measured here rather than taken from the check, so it means
+ * the same thing everywhere and cannot be omitted.
  */
 async function runOne(
   check: DoctorCheck,
@@ -147,8 +136,7 @@ async function runOne(
       message: `check "${check.id}" threw ${name}`,
       details: message,
       durationMs: ctx.clock.now() - startedAt,
-      // Interpreting SDK errors is `runner/errors.ts`'s job (§8.1). This is
-      // the last-resort net for a check that did not do that itself.
+      // Last-resort net. SDK errors are interpreted by runner/errors.ts (§8.1).
       evidence: { threw: name },
     };
   }
@@ -156,7 +144,7 @@ async function runOne(
 
 interface PhaseState {
   results: Map<string, CheckResult>;
-  /** Head of each skip chain, so transitive skips can name the real cause. */
+  /** Head of each skip chain, so transitive skips name the original failure. */
   rootCause: Map<string, string>;
   inRun: Set<string>;
 }
@@ -178,8 +166,7 @@ function readiness(check: DoctorCheck, state: PhaseState): Readiness {
         rootCause: state.rootCause.get(dep) ?? dep,
       };
     }
-    // `pass` and `warn` both satisfy a dependency: a warning means "you are
-    // exposed to a documented issue", not "this environment is unusable".
+    // `pass` and `warn` both satisfy a dependency (finding F38 §28.2).
   }
   return { kind: "ready" };
 }
@@ -218,8 +205,8 @@ async function runPhase(
     }
 
     if (inFlight.size === 0 && !progressed) {
-      // Unreachable: cycles and tier conflicts are rejected up front. Kept as
-      // a loud failure rather than an infinite loop if that ever stops holding.
+      // Unreachable while cycles and tier conflicts are rejected up front.
+      // Kept as a loud failure rather than an infinite loop.
       throw new Error(
         `Scheduler deadlock: ${[...pending.keys()].map((id) => `"${id}"`).join(", ")} ` +
           `can never become ready. This indicates a scheduling bug.`,
@@ -231,9 +218,11 @@ async function runPhase(
 }
 
 /**
- * Runs every registered check and returns one `CheckResult` each, in registry
- * order. Never throws for a check-level problem; throws only for a malformed
- * graph, which is a broken build rather than a diagnosable environment.
+ * Runs every selected check and returns one `CheckResult` each, in registry
+ * order.
+ *
+ * Throws only for a malformed graph (cycle, tier conflict, invalid
+ * concurrency). Check-level problems become results, never exceptions.
  */
 export async function runChecks(
   registry: CheckRegistry,
@@ -249,8 +238,8 @@ export async function runChecks(
   assertNoCycles(all);
   assertTierOrdering(all);
 
-  // §6.4: expensive checks are opt-in. Excluded checks are absent from the
-  // run entirely, and any dependent of one is skipped by `readiness`.
+  // §6.4: expensive checks are opt-in. Excluded checks are absent from the run;
+  // any dependent of one is skipped by `readiness`.
   const selected = all.filter((c) => c.costTier !== "expensive" || options.full === true);
 
   const state: PhaseState = {
@@ -259,8 +248,7 @@ export async function runChecks(
     inRun: new Set(selected.map((c) => c.id)),
   };
 
-  // §7: free checks first, unbounded — they touch no network and create no
-  // resources, so there is nothing to protect against.
+  // §7: free checks first, unbounded. They create no resources.
   await runPhase(
     selected.filter((c) => c.costTier === "free"),
     Number.POSITIVE_INFINITY,
@@ -268,7 +256,7 @@ export async function runChecks(
     ctx,
   );
 
-  // Then everything that creates real resources, through the bounded pool.
+  // Then the resource-creating checks, through the bounded pool.
   await runPhase(
     selected.filter((c) => c.costTier !== "free"),
     concurrency,

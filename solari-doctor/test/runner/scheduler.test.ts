@@ -8,10 +8,8 @@ import { fakeCheck } from "../fixtures/fake-check.js";
 const ctx = createDoctorContext();
 
 /**
- * Advances the microtask queue without touching the clock.
- *
- * Every concurrency assertion below is driven by this plus explicit gates, so
- * nothing depends on wall-clock timing and nothing can be flaky under load.
+ * Advances the microtask queue without touching the clock. Concurrency
+ * assertions use this plus explicit gates, so none depend on wall-clock timing.
  */
 async function flush(turns = 50): Promise<void> {
   for (let i = 0; i < turns; i++) await Promise.resolve();
@@ -58,12 +56,12 @@ describe("concurrency bound", () => {
     const run = runChecks(createCheckRegistry(checks), ctx, { concurrency: 3 });
 
     await flush();
-    // Exactly the cap — six were available, three were started.
+    // Six available, three started.
     expect(gate.inFlight).toBe(3);
 
     gate.releaseOne();
     await flush();
-    // The pool refilled: still exactly three, never four.
+    // Refilled to three, not four.
     expect(gate.inFlight).toBe(3);
 
     await gate.drain();
@@ -116,7 +114,7 @@ describe("free tier", () => {
     const checks = ["a", "b", "c", "d", "e"].map((id) =>
       fakeCheck(id, { costTier: "free", onRun: gate.onRun }),
     );
-    // Cap of 1 — if free checks were subject to it, only one would start.
+    // Cap of 1: if free checks obeyed it, only one would start.
     const run = runChecks(createCheckRegistry(checks), ctx, { concurrency: 1 });
 
     await flush();
@@ -173,7 +171,7 @@ describe("skip propagation", () => {
 
     expect(byId.get("b")?.status).toBe("skip");
     expect(byId.get("c")?.status).toBe("skip");
-    // "c" was blocked by "b", but the thing to go and fix is "a".
+    // "c" was blocked by "b"; the actionable cause is "a".
     expect(byId.get("c")?.evidence).toMatchObject({ blockedBy: "b", rootCause: "a" });
     expect(byId.get("c")?.message).toContain("a");
   });

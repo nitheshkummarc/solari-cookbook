@@ -15,11 +15,7 @@ import {
 
 import { mapSdkError, sanitizeErrorMessage } from "../../src/runner/errors.js";
 
-/**
- * Observed live during verification (finding F28), not invented:
- *   browser: SolariError, status 401, code undefined
- *   message: `Solari POST /sessions failed: 401 {"error":"Unauthorized"}`
- */
+/** Shape observed live during verification (finding F28). */
 const OBSERVED_BROWSER_401_MESSAGE =
   'Solari POST /sessions failed: 401 {"error":"Unauthorized"}';
 
@@ -47,8 +43,7 @@ describe("model A — @solarisdk/browser", () => {
       (code) => mapSdkError(new BrowserSolariError("x", 400, undefined, code), "browser").message,
     );
 
-    // Distinct, not merely present: a shared "something went wrong" for all
-    // five would defeat the point of mapping them at all.
+    // Distinct, not merely present.
     expect(new Set(messages).size).toBe(codes.length);
     for (const message of messages) expect(message).not.toMatch(/unrecognised/i);
   });
@@ -78,11 +73,8 @@ describe("model A — @solarisdk/browser", () => {
 });
 
 describe("model B — instanceof ordering is load-bearing", () => {
-  /**
-   * The mistake this module exists to prevent. All four extend GatewayError,
-   * so testing the parent first maps every one of them to the generic gateway
-   * message — which compiles, typechecks, and is wrong.
-   */
+  // All four extend GatewayError. Testing the parent first maps every one of
+  // them to the generic gateway message, with no compile or type error.
   it("maps each GatewayError subclass to its own message, not the parent's", () => {
     const gatewayMessage = mapSdkError(new GatewayError(500, "boom"), "core").message;
 
@@ -110,8 +102,7 @@ describe("model B — instanceof ordering is load-bearing", () => {
 
   it("confirms the hierarchy the ordering depends on", () => {
     const authError = new AuthError("unauthorized");
-    // If these ever stop holding, the ordering above is no longer required —
-    // and, more importantly, no longer sufficient.
+    // If this stops holding, the ordering above is no longer sufficient.
     expect(authError instanceof GatewayError).toBe(true);
     expect(authError instanceof CoreSolariError).toBe(true);
   });
@@ -185,7 +176,7 @@ describe("cross-product mis-import (finding F39)", () => {
 
   it("omits the flag entirely when the product is right", () => {
     const mapped = mapSdkError(new AuthError("x"), "core");
-    // exactOptionalPropertyTypes: absent, not an explicit undefined.
+    // Absent, not an explicit undefined.
     expect("productMismatch" in mapped.evidence).toBe(false);
   });
 });

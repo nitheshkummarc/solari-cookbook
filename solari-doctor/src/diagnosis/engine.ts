@@ -1,26 +1,22 @@
 /**
- * Diagnosis engine — design.md §4.
+ * Diagnosis engine. See design.md §4.
  *
- * A pure function `CheckResult[] -> Diagnosis[]`. No I/O, no network, no
- * filesystem, no SDK import. That constraint is not stylistic: it is what makes
- * exhaustive combination testing cheap, and it is enforced at lint time by an
- * import restriction on `src/diagnosis/**` rather than left to review.
+ * A pure function `CheckResult[] -> Diagnosis[]`: no I/O, no network, no
+ * filesystem, no SDK. Enforced by a lint import restriction on
+ * `src/diagnosis/**`.
  *
- * Why this layer exists at all: a check only knows about itself. "the installed
- * SDK is 0.1.2" and "the process did not exit" are two independent facts in
- * isolation, and a single high-confidence cause together. Correlating after the
- * fact is the only way to get that without duplicating version-awareness logic
- * into every check that might care.
+ * A check only reports on itself. Correlating results here avoids duplicating
+ * cross-check logic — such as version awareness — into every check that would
+ * otherwise need it.
  */
 
-import type { CheckResult, CheckStatus, Diagnosis } from "../types.js";
+import type { CheckResult, CheckStatus, Confidence, Diagnosis } from "../types.js";
 
 /**
- * Read-only view over one run's results, handed to each rule.
+ * Read-only view over one run's results.
  *
- * Rules never see the array directly — a rule that could iterate could also
- * accumulate state across calls, and the engine's determinism depends on rules
- * being pure functions of the results they declare.
+ * Rules receive this rather than the array so they cannot iterate or
+ * accumulate state; determinism depends on rules being pure.
  */
 export interface ResultLookup {
   /** The result for a check id, or `undefined` if it did not run. */
@@ -34,18 +30,17 @@ export interface ResultLookup {
 }
 
 export interface DiagnosisRule {
-  /** Stable id for the rule itself — not a check id. */
+  /** Stable id for the rule. Not a check id. */
   id: string;
   /**
    * Check ids this rule reads. Becomes `supportingChecks`, filtered to those
-   * that actually produced a result, so a diagnosis never cites a check that
-   * did not run.
+   * that produced a result, so a diagnosis never cites a check that did not run.
    */
   reads: readonly string[];
-  /** Pure predicate. Must not close over anything mutable. */
+  /** Must be pure and must not close over mutable state. */
   matches(results: ResultLookup): boolean;
   cause: string;
-  confidence: Diagnosis["confidence"];
+  confidence: Confidence;
   remediation: string;
   issueRef?: string;
 }
@@ -64,15 +59,11 @@ function createLookup(results: readonly CheckResult[]): ResultLookup {
 }
 
 /**
- * Correlates results into named causes.
+ * Correlates results into named causes, in rule declaration order.
  *
- * Deterministic: the same results always produce the same diagnoses, in rule
- * declaration order. Ordering for display is the renderer's concern — sorting
- * here would bake presentation into the logic layer.
- *
- * A rule that throws is a defect in that rule, not a reason to lose every other
- * diagnosis, so it is contained and skipped. This mirrors the scheduler's
- * treatment of a check that throws.
+ * Deterministic. Display ordering is left to the renderer. A rule that throws
+ * is skipped rather than failing the run, mirroring the scheduler's handling of
+ * a throwing check.
  */
 export function diagnose(
   results: readonly CheckResult[],

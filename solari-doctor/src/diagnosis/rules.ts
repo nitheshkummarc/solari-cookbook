@@ -1,24 +1,22 @@
 /**
- * Diagnosis rules — data, not logic (design.md §15.1).
+ * Diagnosis rules: data, separated from the engine (design.md §15.1).
  *
- * Separated from the engine because rules change often and the engine rarely.
- * Every rule below is traceable to something verified: a cookbook gotcha, a
- * GitHub issue, or a measurement recorded in `docs/findings.md`. A rule that
- * cannot cite one does not belong here — design.md §3 principle 5.
+ * Each rule cites a cookbook gotcha, a GitHub issue, or a measurement in
+ * `docs/findings.md`; design.md §3 principle 5 requires it.
  *
- * Rules referencing checks that do not exist yet simply never match, so this
- * file grows alongside modules 9-13 rather than waiting for them.
+ * A rule naming a check that does not exist yet never matches, so this file can
+ * grow ahead of the checks themselves.
  */
 
 import type { DiagnosisRule } from "./engine.js";
 
 /**
- * The example design.md §4 gives, and the reason the diagnosis layer exists.
+ * The correlation design.md §4 uses as its example.
  *
- * `sdk-version` reports exposure (a static version read); `browser-lifecycle`
- * reports an observation (the process did not exit). Neither is conclusive
- * alone. Together they are the documented pre-0.1.3 hang, measured at L4:
- * 0.1.2 was still hung at 75s where 0.1.3 exited in ~3s (finding F27).
+ * `sdk-version` reports exposure from a static version read; `browser-lifecycle`
+ * reports an observed hang. Neither is conclusive alone. Together they are the
+ * documented pre-0.1.3 hang: 0.1.2 was still hung at 75s where 0.1.3 exited in
+ * ~3s (finding F27).
  */
 const KNOWN_PRE_013_HANG: DiagnosisRule = {
   id: "known-pre-0.1.3-hang",
@@ -36,11 +34,10 @@ const KNOWN_PRE_013_HANG: DiagnosisRule = {
 };
 
 /**
- * The same observation on a version where the bug is supposed to be fixed.
+ * The same hang on a version where the documented bug is fixed.
  *
- * Deliberately *not* high confidence. F18 established that 0.1.3 exits cleanly,
- * so a hang here is something this project has not seen — which makes it worth
- * reporting and worth being honest about not understanding.
+ * Low confidence by design. Finding F18 established that 0.1.3 exits cleanly,
+ * so this combination has not been observed and the cause is unknown.
  */
 const UNEXPECTED_HANG_ON_FIXED_VERSION: DiagnosisRule = {
   id: "unexpected-hang-on-fixed-version",
@@ -57,11 +54,11 @@ const UNEXPECTED_HANG_ON_FIXED_VERSION: DiagnosisRule = {
 };
 
 /**
- * Turns a cascade of skips into one actionable statement.
+ * Collapses a cascade of skips into one statement.
  *
- * Every resource-creating check depends on `auth`, so a failed key produces one
- * real failure and five skips. The skips each name the blocker (design.md §7),
- * but the run as a whole reads better with a single cause at the top.
+ * Every resource-creating check depends on `auth`, so a failed key yields one
+ * failure and five skips. Each skip names the blocker (design.md §7); this adds
+ * a single cause for the run.
  */
 const AUTH_BLOCKS_EVERYTHING: DiagnosisRule = {
   id: "auth-blocks-everything",
@@ -78,11 +75,11 @@ const AUTH_BLOCKS_EVERYTHING: DiagnosisRule = {
 };
 
 /**
- * The one check with a resource consequence rather than a developer-time one.
+ * The only check with a resource consequence rather than a developer-time one.
  *
- * The claim is deliberately limited to what the API proves: `sandboxes.get()`
- * reported `state: "running"` after `close()` (F19, L4), and the response
- * carries no billing field at all. design.md §6.6 locks this phrasing.
+ * The claim is limited to what the API proves: `sandboxes.get()` reported
+ * `state: "running"` after `close()` (finding F19), and the response carries no
+ * billing field. design.md §6.6 locks this wording.
  */
 const SANDBOX_LEFT_RUNNING: DiagnosisRule = {
   id: "sandbox-left-running",
@@ -99,7 +96,7 @@ const SANDBOX_LEFT_RUNNING: DiagnosisRule = {
   issueRef: "solari-cookbook#README-gotcha-4",
 };
 
-/** Evaluated in this order; the engine preserves it. */
+/** Evaluated in this order. */
 export const DIAGNOSIS_RULES: readonly DiagnosisRule[] = [
   AUTH_BLOCKS_EVERYTHING,
   KNOWN_PRE_013_HANG,

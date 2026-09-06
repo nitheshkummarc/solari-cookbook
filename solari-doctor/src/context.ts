@@ -1,59 +1,49 @@
 /**
- * DoctorContext — design.md §5.
+ * Execution context passed to every check. See design.md §5.
  *
- * Every field here was derived from what the seven checks actually require
- * (design.md §5's derivation table), not designed up front. Deliberately
- * absent, and each for a stated reason:
- *
- *   - no logger              checks never print (design.md §4)
- *   - no `full` flag         the scheduler gates by costTier (design.md §7)
- *   - no desktop/template/volume clients   no locked check touches them
- *   - no AbortSignal         not required by anything in §6
- *   - no child-harness paths §5 marks these "provisional, not yet earned";
- *                            decided when browser-lifecycle actually needs them
+ * Fields are derived from what the seven checks require. Deliberately absent:
+ * a logger (checks do not print, design.md §4), a `full` flag (the scheduler
+ * gates by cost tier, §7), desktop/template/volume clients (unused by any
+ * check), and the child-process harness paths (§5 marks these provisional
+ * until browser-lifecycle needs them).
  */
 
 import { Solari, type SolariRegion } from "@solarisdk/browser";
 import { SolariClient } from "@solarisdk/sdk";
 
-/** Injected so poll and deadline logic is testable without real waits. */
+/** Injected so poll and deadline logic can be tested without real waits. */
 export interface Clock {
   now(): number;
   sleep(ms: number): Promise<void>;
 }
 
-/** Timing constants in one place, each traceable to evidence. */
 export interface Deadlines {
-  /** `browser-lifecycle`: the child process must exit within this. */
+  /** browser-lifecycle: deadline for the child process to exit. */
   childExitMs: number;
-  /** `recording-lifecycle`: documented ~30s plus our margin. */
+  /** recording-lifecycle: how long to poll for a replay URL. */
   replayPollMs: number;
 }
 
 export interface DoctorContext {
-  /** Raw key. Never logged, never placed in `evidence`, never in `--report`. */
+  /** Never logged, never placed in `evidence`, never in `--report`. */
   readonly apiKey: string | undefined;
 
   /**
-   * Root to resolve the *user's* installed SDK from. Defaults to
+   * Root used to resolve the user's installed SDK. Defaults to
    * `process.cwd()`.
    *
-   * This is not cosmetic. solari-doctor depends on `@solarisdk/browser`
-   * itself, so resolving the package through its own module graph would report
-   * the doctor's version rather than the user's — a check that always passes
-   * and tells the user nothing (findings F35, §19.2).
+   * solari-doctor depends on `@solarisdk/browser` itself, so resolving through
+   * its own module graph would report the doctor's version rather than the
+   * user's (findings F35, §19.2).
    */
   readonly projectRoot: string;
 
-  /** Undefined means the SDK defaults (region `"us-west"`). */
+  /** Omitted means the SDK default (`"us-west"`). */
   readonly region?: SolariRegion;
-  /** Undefined means the SDK default (`https://api.getsolari.com`). */
+  /** Omitted means the SDK default (`https://api.getsolari.com`). */
   readonly baseUrl?: string;
 
-  /**
-   * Lazily constructed and memoised. A default run whose `auth` check fails
-   * must never pay for a browser client it will not use.
-   */
+  /** Constructed on first call and memoised. */
   browser(): Solari;
   sandbox(): SolariClient;
 
@@ -71,29 +61,19 @@ export interface DoctorContextOptions {
 }
 
 /**
- * `browser-lifecycle` observes whether a child process exits on its own.
- *
- * Corrected in module 3. The earlier 3s came from the `deadlineMs: 3000` in
- * design.md §5's evidence example, but F27 measured a *healthy* 0.1.3
- * close-and-exit at ~3s — so a 3s deadline sat directly on top of the
- * measured-good case and would report a working environment as hung on any
- * slow launch, cold start, or loaded CI runner. A deadline must clear the
- * healthy case by a real margin, not tie it.
- *
- * 5s is ~1.7x the measured healthy path. The failing case it must distinguish
- * is unbounded (F27: 0.1.2 was still hung at 75s), so a larger margin costs
- * nothing in detection power and buys tolerance for a slow machine.
+ * ~1.7x the healthy exit time measured on 0.1.3 (~3s, finding F27). A 3s
+ * deadline would sit on top of the measured-good case and report a working
+ * environment as hung. The failing case is unbounded (0.1.2 was still hung at
+ * 75s), so extra margin costs no detection power.
  */
 const DEFAULT_CHILD_EXIT_MS = 5_000;
 
 /**
- * The cookbook README documents "poll for ~30s before giving up". That is the
- * only figure presented as a Solari fact (design.md §6.4); the extra 15s is our
- * engineering margin and must be described that way in any output.
+ * The cookbook documents ~30s (design.md §6.4); the remainder is margin and
+ * must be described as ours, not as a Solari figure.
  *
- * Note A6 is still open: one measured run had a replay at 8.2s, another saw no
- * replay within 60s (finding F33). This value is a starting point, not a
- * verified window.
+ * Not a verified window. A6 is open: one run produced a replay at 8.2s, another
+ * saw none within 60s (finding F33).
  */
 const DEFAULT_REPLAY_POLL_MS = 45_000;
 
@@ -102,6 +82,13 @@ const systemClock: Clock = {
   sleep: (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
 };
 
+/**
+ * Returns the key, or throws if it is absent.
+ *
+ * Reaching this is a scheduler bug rather than a user-facing path: `auth`
+ * reports a missing key as a `CheckResult`, and dependents are skipped before
+ * any client is requested.
+ */
 function requireApiKey(apiKey: string | undefined, what: string): string {
   if (apiKey === undefined || apiKey === "") {
     throw new Error(
@@ -113,6 +100,7 @@ function requireApiKey(apiKey: string | undefined, what: string): string {
   return apiKey;
 }
 
+/** Builds a context. No client is constructed until its accessor is called. */
 export function createDoctorContext(
   options: DoctorContextOptions = {},
 ): DoctorContext {
@@ -125,15 +113,14 @@ export function createDoctorContext(
     replayPollMs: options.deadlines?.replayPollMs ?? DEFAULT_REPLAY_POLL_MS,
   };
 
-  // Memoisation cells. Nothing is constructed until the accessor is called.
   let browserClient: Solari | undefined;
   let sandboxClient: SolariClient | undefined;
 
   return {
     apiKey,
     projectRoot,
-    // `exactOptionalPropertyTypes` is on: an absent option must stay absent
-    // rather than becoming an explicit `undefined`.
+    // Conditional spread: `exactOptionalPropertyTypes` requires an unsupplied
+    // option to stay absent rather than become an explicit `undefined`.
     ...(options.region !== undefined ? { region: options.region } : {}),
     ...(options.baseUrl !== undefined ? { baseUrl: options.baseUrl } : {}),
     clock,
@@ -149,10 +136,9 @@ export function createDoctorContext(
     },
 
     sandbox(): SolariClient {
-      // SolariClient, not the standalone SandboxClient: `baseUrl` is optional
-      // here and required there, so the standalone client would force this
-      // tool to hardcode a gateway URL — the same defect class as issue #27
-      // (decision C8, design.md §6.5).
+      // SolariClient rather than the standalone SandboxClient: `baseUrl` is
+      // optional here and required there, so the standalone client would force
+      // a hardcoded gateway URL (decision C8, design.md §6.5).
       sandboxClient ??= new SolariClient({
         apiKey: requireApiKey(apiKey, "sandbox"),
         ...(options.baseUrl !== undefined ? { baseUrl: options.baseUrl } : {}),

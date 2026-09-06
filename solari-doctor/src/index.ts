@@ -1,8 +1,7 @@
 /**
- * solari-doctor — package entry point.
+ * Package entry point.
  *
- * Scaffold only. The public surface is added in build order (design.md §14):
- * types -> registry -> runner -> diagnosis -> renderers -> checks.
+ * The public surface is added at module 8, when the CLI is wired.
  */
 
 export {};

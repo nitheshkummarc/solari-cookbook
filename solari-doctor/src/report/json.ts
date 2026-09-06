@@ -1,18 +1,16 @@
 /**
- * JSON renderer — design.md §4 and §9.
+ * JSON renderer. See design.md §4 and §9.
  *
- * Returns a string; the CLI writes it. `--json` is the CI-pipeable form, so the
- * shape is versioned from v1 (§9): a future consumer must never have to guess
- * which shape an old payload is in.
+ * Returns a string; the CLI performs the write. The payload is versioned from
+ * v1 so a consumer never has to infer the shape.
  *
- * `schemaVersion` is shared with the `--report` bundle deliberately. They are
- * the same data at different levels of detail, and two independently drifting
- * version numbers would be worse than one.
+ * `schemaVersion` is shared with the `--report` bundle: the same data at
+ * different levels of detail, so a single version number covers both.
  */
 
 import type { CheckResult, Diagnosis } from "../types.js";
 
-/** design.md §9: "`--report` output is versioned from v1". */
+/** design.md §9. */
 export const SCHEMA_VERSION = 1;
 
 export interface JsonReport {
@@ -29,13 +27,11 @@ export function buildJsonReport(
 }
 
 /**
- * Pretty-printed, with a trailing newline so shell redirection produces a
- * well-formed file rather than one missing its final newline.
+ * Pretty-printed with a trailing newline, so shell redirection produces a
+ * well-formed file.
  *
- * `JSON.stringify` drops `undefined` values, which aligns with the
- * `exactOptionalPropertyTypes` convention (CLAUDE.md §17 rule 1): an optional
- * field that was never set is absent from the output rather than serialised
- * as `null`.
+ * `JSON.stringify` omits `undefined`, so an unset optional field is absent from
+ * the output rather than serialised as `null`.
  */
 export function renderJson(
   results: readonly CheckResult[],

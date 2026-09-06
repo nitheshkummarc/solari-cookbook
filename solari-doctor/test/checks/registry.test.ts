@@ -10,8 +10,8 @@ describe("ordering", () => {
       fakeCheck("alpha"),
       fakeCheck("beta"),
     ]);
-    // Registration order, deliberately not alphabetical and not costTier
-    // order — scheduling order is the scheduler's job (design.md §7).
+    // Neither alphabetical nor costTier order; scheduling order is the
+    // scheduler's concern (design.md §7).
     expect(r.ids()).toEqual(["gamma", "alpha", "beta"]);
   });
 
@@ -80,8 +80,7 @@ describe("empty registry", () => {
   });
 
   it("the real registry is currently empty — no checks are built yet", () => {
-    // This asserts today's truth. It is expected to change in module 9, and
-    // changing it is the point: it makes "the first check landed" explicit.
+    // Expected to change when the first check is registered (module 9).
     expect(registry.ids()).toEqual([]);
   });
 });
@@ -118,7 +117,7 @@ describe("dependsOn validation (design.md §5)", () => {
   });
 
   it("accepts a dependency declared later in the list", () => {
-    // Registration order is not dependency order; the scheduler resolves that.
+    // Registration order is not dependency order.
     expect(() =>
       createCheckRegistry([
         fakeCheck("browser-lifecycle", { dependsOn: ["auth"] }),

@@ -1,9 +1,8 @@
 /**
  * Fake `DoctorCheck`s for unit tests.
  *
- * design.md §10: the registry and scheduler are tested in isolation, against
- * fakes, with no live calls anywhere. Shared here so module 4's scheduler tests
- * exercise the same shape rather than inventing a second one.
+ * design.md §10: the registry and scheduler are tested against fakes, with no
+ * live calls. Shared so both suites exercise the same shape.
  */
 
 import type { CheckResult, CostTier, DoctorCheck } from "../../src/types.js";
@@ -26,8 +25,8 @@ export function fakeCheck(
     id,
     description: options.description ?? `fake check ${id}`,
     costTier: options.costTier ?? "free",
-    // `exactOptionalPropertyTypes`: an absent option must stay absent, not
-    // become an explicit `undefined`.
+    // Conditional spread: an absent option must stay absent under
+    // `exactOptionalPropertyTypes`.
     ...(options.dependsOn !== undefined ? { dependsOn: options.dependsOn } : {}),
     async run(): Promise<CheckResult> {
       await options.onRun?.(id);

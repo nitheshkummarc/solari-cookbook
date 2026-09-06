@@ -93,8 +93,7 @@ describe("terminal renderer", () => {
       const line = output.split("\n").find((l) => l.includes(` ${result.id} `));
       return line?.indexOf(result.message);
     });
-    // "auth" and "browser-lifecycle" differ by 13 characters; without padding
-    // these columns would not agree.
+    // "auth" and "browser-lifecycle" differ by 13 characters.
     expect(new Set(columns).size).toBe(1);
     expect(columns[0]).toBeGreaterThan(0);
   });

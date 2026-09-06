@@ -1,16 +1,14 @@
 /**
- * Terminal renderer — design.md §4.
+ * Terminal renderer. See design.md §4.
  *
- * Returns a string; it does not print. The CLI owns every write to stdout
- * (module 8), which keeps this layer snapshot-testable and keeps I/O in one
- * place. Renderers consume `CheckResult[]` and `Diagnosis[]` and nothing
- * imports back out of them.
+ * Returns a string; the CLI performs the write. Consumes `CheckResult[]` and
+ * `Diagnosis[]`; nothing imports back out of this layer.
  */
 
 import type { CheckResult, CheckStatus, Diagnosis } from "../types.js";
 
 export interface TerminalOptions {
-  /** ANSI colour. Callers pass `false` for a non-TTY, a pipe, or NO_COLOR. */
+  /** Pass `false` for a non-TTY, a pipe, or when NO_COLOR is set. */
   color?: boolean;
   /** Wrap width for remediation text. */
   width?: number;
@@ -28,13 +26,7 @@ const ANSI = {
   cyan: "\u001b[36m",
 } as const;
 
-/**
- * Status glyphs are ASCII, not Unicode symbols.
- *
- * A diagnostic that renders as mojibake in the terminal it is diagnosing has
- * undermined its own credibility before the reader gets to the content, and
- * Windows consoles are exactly where that happens.
- */
+/** ASCII rather than Unicode symbols, which render as mojibake on some consoles. */
 const GLYPH: Readonly<Record<CheckStatus, string>> = {
   pass: "+",
   warn: "!",
@@ -53,7 +45,7 @@ function paint(text: string, code: string, color: boolean): string {
   return color ? `${code}${text}${ANSI.reset}` : text;
 }
 
-/** Greedy wrap. Words longer than the width are left intact rather than cut. */
+/** Greedy wrap. A word longer than `width` is left intact rather than cut. */
 export function wrapText(text: string, width: number, indent: string): string[] {
   const words = text.split(/\s+/).filter((w) => w.length > 0);
   if (words.length === 0) return [];
@@ -118,8 +110,7 @@ export function renderTerminal(
     const duration = paint(formatDuration(result.durationMs), ANSI.dim, color);
     lines.push(`  ${glyph} ${id}  ${result.message}  ${duration}`);
 
-    // Remediation belongs to a check only when that check itself failed; a
-    // passing check with advice attached is noise.
+    // Remediation is shown only for a check that did not pass.
     if (result.remediation !== undefined && result.status !== "pass") {
       lines.push(...wrapText(result.remediation, width, "      "));
     }

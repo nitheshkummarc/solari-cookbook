@@ -1,88 +1,70 @@
 /**
- * Core data contracts — design.md §5.
+ * Core data contracts. See design.md §5.
  *
- * Types and interfaces only. No logic lives here, and nothing is added beyond
- * what §5 locks: shared vocabulary is defined once and imported (design.md
- * §8.1), so a field invented locally by a check is a defect, not a shortcut.
+ * Types only — no logic. Shared vocabulary is declared here and imported;
+ * checks must not redeclare it locally (design.md §8.1).
  */
 
 import type { DoctorContext } from "./context.js";
 
 /**
- * The verdict of a single check, as a fact rather than a conclusion.
+ * Outcome of a single check.
  *
- * `skip` is specifically the status used when a dependency failed (design.md
- * §7) — the blocking check must be named in `message`. It must never be used
- * to hide an error the check actually hit; that is `fail`.
+ * `skip` means the check did not run because a dependency failed (design.md
+ * §7). An error the check hit itself is `fail`, not `skip`.
  */
 export type CheckStatus = "pass" | "warn" | "fail" | "skip";
 
 /**
- * Drives scheduling and default-vs-`--full` (design.md §7).
- *
- * This lives on the check itself rather than in a separate config so it cannot
- * drift from the code it governs. A wrong value here creates real, billable
- * resources — treat it as a resource-safety bug, not a cosmetic one.
+ * Scheduling class. Declared on the check so it cannot drift from the code it
+ * governs. `expensive` runs only under `--full`.
  */
 export type CostTier = "free" | "cheap" | "expensive";
 
-/** How strongly the supporting facts imply a named cause. */
 export type Confidence = "low" | "medium" | "high";
 
-/** What one check observed. Facts and evidence — never a rendered verdict. */
+/** What one check observed. */
 export interface CheckResult {
-  /** The producing check's id; one of the seven locked ids (design.md §6). */
+  /** One of the seven check ids in design.md §6. */
   id: string;
   status: CheckStatus;
-  /** One-line summary. For `skip`, must name the blocking check. */
+  /** One-line summary. For `skip`, names the blocking check. */
   message: string;
   details?: string;
-  /** What to do about it. Traceable to docs or an issue (design.md §3). */
+  /** Traceable to documentation or a specific issue (design.md §3). */
   remediation?: string;
-  /** Wall-clock duration in ms. Populated even for `skip` (expected ~0). */
+  /** Set by the scheduler, not the check. Populated for `skip` too. */
   durationMs: number;
-  /** e.g. `"solari-cookbook#25"`. Never invented — verified issues only. */
+  /** Verified issue references only, e.g. `"solari-cookbook#25"`. */
   issueRef?: string;
   /**
-   * Structured facts actually observed. First-class, not an afterthought:
-   * `--report` is the accumulated evidence, so it is cheap only if checks
-   * populate this properly.
-   *
-   * Never secrets. Every new key needs a `--report` safety verdict before it
-   * ships (design.md §9).
+   * Structured facts the check observed. Must contain no secrets; every new
+   * key needs a `--report` safety verdict before it ships (design.md §9).
    */
   evidence?: Record<string, unknown>;
 }
 
-/** The single abstraction for a check. There is no second check shape. */
+/** The single abstraction for a check. */
 export interface DoctorCheck {
-  /** Stable id; also the value accepted by `--explain <id>`. */
+  /** Stable id; also the argument accepted by `--explain`. */
   id: string;
   description: string;
-  /** Ids that must pass first. Currently only `auth` is ever a dependency. */
+  /** Ids that must pass first. Only `auth` is currently a dependency. */
   dependsOn?: string[];
   costTier: CostTier;
   /**
-   * Runs the check and returns facts.
-   *
-   * Must not print (design.md §4). Must not throw for an expected failure —
-   * it returns `status: "fail"` instead.
+   * Returns facts. Must not write to stdout or stderr (design.md §4), and must
+   * return `status: "fail"` rather than throwing for an expected failure.
    */
   run(ctx: DoctorContext): Promise<CheckResult>;
 }
 
-/**
- * A named cause produced by correlating several `CheckResult`s.
- *
- * Produced by a pure function `CheckResult[] -> Diagnosis[]` (design.md §4):
- * the same inputs always produce the same output, with no I/O anywhere.
- */
+/** A named cause derived from several `CheckResult`s. */
 export interface Diagnosis {
-  /** e.g. "known lifecycle bug in SDK <0.1.3". Derivable from the support. */
   cause: string;
   confidence: Confidence;
   remediation: string;
-  /** Non-empty; every id must appear in the results that produced this. */
+  /** Non-empty. Every id appeared in the results this was derived from. */
   supportingChecks: string[];
   issueRef?: string;
 }

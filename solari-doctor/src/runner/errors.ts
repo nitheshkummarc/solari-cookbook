@@ -1,18 +1,16 @@
 /**
- * Shared SDK error mapping — design.md §8 and §8.1.
+ * Shared SDK error mapping. See design.md §8 and §8.1.
  *
- * One error path, used identically everywhere. Checks pass a caught error in
- * and get a result shape back; no check writes its own `instanceof` ladder or
- * its own wording for a condition another check can also hit.
+ * Checks pass a caught error in and receive a message, a remediation and
+ * report-safe evidence. No check implements its own `instanceof` ladder or its
+ * own wording for a condition another check can also hit.
  *
- * This module owns the `instanceof` ordering, and that ordering is the whole
- * point: `AuthError extends GatewayError extends SolariError`, so testing the
- * parent first silently swallows every 401. That failure compiles, passes a
- * typecheck, and produces a plausible-looking wrong answer — which is why the
- * ordering is asserted by tests rather than trusted to review.
+ * `AuthError extends GatewayError extends SolariError`, so the ordering in
+ * `mapCore` is load-bearing: testing the parent first swallows every 401
+ * without a compile or type error. The ordering is covered by tests.
  *
- * Security boundary (design.md §9): nothing leaving this module contains the
- * raw error object, a stack trace, or an API key. Every message is sanitised.
+ * Nothing returned from this module contains the raw error, a stack trace or an
+ * API key (design.md §9).
  */
 
 import { SolariError as BrowserSolariError } from "@solarisdk/browser";
@@ -29,33 +27,28 @@ import {
 } from "@solarisdk/sdk";
 
 /**
- * Which SDK the caller was talking to.
+ * Which SDK the caller was using.
  *
- * This is not cosmetic. `@solarisdk/browser` and `@solarisdk/core` each export
- * their own `SolariError` class, and they are **not** the same class — a
- * browser error is not `instanceof` the core one, and vice versa (finding F39,
- * verified at runtime). Passing the wrong product would make every check fall
- * through to the unrecognised branch while still looking like it worked.
+ * `@solarisdk/browser` and `@solarisdk/core` each export a distinct class named
+ * `SolariError`; neither is `instanceof` the other (finding F39). Passing the
+ * wrong product sends every error to the unrecognised branch.
  */
 export type SdkProduct = "browser" | "core";
 
 /** Report-safe facts about a mapped error. Never the error object itself. */
 export interface MappedErrorEvidence {
   product: SdkProduct;
-  /** Constructor name only — useful, and cannot carry a payload. */
+  /** Constructor name only. */
   errorClass: string;
-  /** False when nothing matched; the result is still structured. */
+  /** False when nothing matched. The result is still structured. */
   recognized: boolean;
   /** HTTP status, where the SDK exposes one. */
   status?: number;
-  /** Gateway code, where the SDK exposes one. Never present for a 401 (F28). */
+  /** Gateway code where the SDK supplies one. Absent for a 401 (finding F28). */
   code?: string;
-  /**
-   * Set when the error came from a different SDK than the caller declared.
-   * Surfacing this turns a silent mis-import into a visible defect.
-   */
+  /** Set when the error came from a different SDK than `product` declares. */
   productMismatch?: boolean;
-  /** The SDK's own message, with any key-shaped token removed. */
+  /** The SDK's message with any key-shaped token removed. */
   sanitizedMessage: string;
 }
 
@@ -66,11 +59,10 @@ export interface MappedError {
 }
 
 /**
- * Any `slr_live_` / `slr_test_` token is stripped before a message is stored.
+ * Strips `slr_live_` / `slr_test_` tokens and caps length.
  *
- * No observed SDK message has contained a key (F28), so this is defence in
- * depth rather than a known leak — but §9's rule is that the key must never
- * reach a report, and "we checked once and it was fine" is not a mechanism.
+ * No observed SDK message has contained a key (finding F28); this is defence in
+ * depth for design.md §9.
  */
 const API_KEY_PATTERN = /slr_(?:live|test)_[A-Za-z0-9_-]+/g;
 const MAX_MESSAGE_LENGTH = 300;
@@ -170,7 +162,7 @@ const CONNECTION_LOST: Mapping = {
     "or use kill() if the intent was to stop it.",
 };
 
-/** Browser SDK codes (F13). No auth member exists — 401 is status-only (F28). */
+/** Browser SDK codes (finding F13). No auth member exists; 401 is status-only. */
 const BROWSER_CODE_MAPPINGS: Readonly<Record<string, Mapping>> = {
   FeatureRequiresPlan: FEATURE_REQUIRES_PLAN,
   PlanLimitExceeded: PLAN_LIMIT,
@@ -189,10 +181,10 @@ function rawMessage(error: unknown): string {
 }
 
 /**
- * Model A — `@solarisdk/browser`.
+ * Model A: `@solarisdk/browser`, which exports one error class.
  *
- * One error class. `status` is checked before `code` because a 401 carries no
- * code at all (F28): matching auth on `.code` would never fire.
+ * `status` is checked before `code` because a 401 carries no code (finding
+ * F28), so matching auth on `.code` would never fire.
  */
 function mapBrowser(error: unknown): { mapping: Mapping; status?: number; code?: string; recognized: boolean } {
   if (!(error instanceof BrowserSolariError)) {
@@ -215,12 +207,11 @@ function mapBrowser(error: unknown): { mapping: Mapping; status?: number; code?:
 }
 
 /**
- * Model B — `@solarisdk/core`, re-exported by `@solarisdk/sdk`.
+ * Model B: `@solarisdk/core`, re-exported by `@solarisdk/sdk`.
  *
- * ORDER IS LOAD-BEARING. The four gateway subclasses are tested before
- * `GatewayError`, and everything is tested before the bare `SolariError`.
- * Reversing any pair here compiles cleanly and silently produces the wrong
- * message — see the ordering tests.
+ * Order is load-bearing. The four gateway subclasses are tested before
+ * `GatewayError`, and all classes before the bare `SolariError`. Reversing any
+ * pair compiles cleanly and returns the wrong message.
  */
 function mapCore(error: unknown): { mapping: Mapping; status?: number; code?: string; recognized: boolean } {
   const status = error instanceof GatewayError ? error.status : undefined;
@@ -231,36 +222,33 @@ function mapCore(error: unknown): { mapping: Mapping; status?: number; code?: st
     ...(code !== undefined ? { code } : {}),
   };
 
-  // --- most-derived first ---------------------------------------------------
+  // Most-derived first.
   if (error instanceof AuthError) return { ...base, mapping: AUTH, recognized: true };
   if (error instanceof PlanError) return { ...base, mapping: FEATURE_REQUIRES_PLAN, recognized: true };
   if (error instanceof ConcurrencyLimitError) return { ...base, mapping: CONCURRENCY_LIMIT, recognized: true };
   if (error instanceof NoCapacityError) return { ...base, mapping: NO_CAPACITY, recognized: true };
-  // --- then their common parent ---------------------------------------------
+  // Their common parent.
   if (error instanceof GatewayError) return { ...base, mapping: GATEWAY, recognized: true };
-  // --- siblings of GatewayError, all extending SolariError directly ---------
+  // Siblings of GatewayError, extending SolariError directly.
   if (error instanceof ActionError) return { ...base, mapping: ACTION_FAILED, recognized: true };
   if (error instanceof TimeoutError) return { ...base, mapping: TIMED_OUT, recognized: true };
   if (error instanceof ConnectionError) return { ...base, mapping: CONNECTION_LOST, recognized: true };
-  // --- finally the root -----------------------------------------------------
+  // The root.
   if (error instanceof CoreSolariError) return { ...base, mapping: UNRECOGNISED, recognized: false };
 
   return { mapping: UNRECOGNISED, recognized: false };
 }
 
 /**
- * Maps any caught error to a message, a remediation, and report-safe evidence.
+ * Maps a caught error to a message, remediation and report-safe evidence.
  *
- * Never throws: an unrecognised shape still returns a structured result. A
- * check must never crash the scheduler because an error was not what it
- * expected.
+ * Never throws. An unrecognised shape still returns a structured result.
  */
 export function mapSdkError(error: unknown, product: SdkProduct): MappedError {
   const mapped = product === "browser" ? mapBrowser(error) : mapCore(error);
 
-  // Declared one SDK, caught an error from the other. Not fatal — the result
-  // is still structured — but it means a check imported the wrong client, and
-  // that must not stay invisible.
+  // Declared one SDK, caught an error from the other: the check imported the
+  // wrong client. Not fatal, but recorded rather than left invisible.
   const mismatched =
     (product === "browser" && error instanceof CoreSolariError) ||
     (product === "core" && error instanceof BrowserSolariError);
