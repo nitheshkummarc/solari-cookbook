@@ -100,6 +100,12 @@ export interface CliDeps {
   cwd?: string;
   /** Colour is enabled only for an interactive stdout with NO_COLOR unset. */
   color?: boolean;
+  /**
+   * Environment the context is built from. Injected rather than read inside
+   * `createDoctorContext` so that a test which does not supply a context is
+   * unaffected by whatever is exported in the shell running it.
+   */
+  env?: Record<string, string | undefined>;
 }
 
 /**
@@ -147,7 +153,13 @@ export async function runCli(
   }
 
   const registry = deps.registry ?? defaultRegistry;
-  const context = deps.context ?? createDoctorContext();
+  const env = deps.env ?? {};
+  const context =
+    deps.context ??
+    createDoctorContext({
+      apiKey: env["SOLARI_API_KEY"],
+      ...(deps.cwd !== undefined ? { projectRoot: deps.cwd } : {}),
+    });
 
   const results = await runChecks(registry, context, { full: options.full });
   const diagnoses = diagnose(results, DIAGNOSIS_RULES);
@@ -188,5 +200,6 @@ export async function main(argv: readonly string[]): Promise<number> {
       writeFile: (path, contents) => writeFileSync(path, contents, "utf8"),
     },
     color,
+    env: process.env,
   });
 }

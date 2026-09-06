@@ -79,9 +79,10 @@ describe("empty registry", () => {
     expect(r.has("auth")).toBe(false);
   });
 
-  it("the real registry is currently empty — no checks are built yet", () => {
-    // Expected to change when the first check is registered (module 9).
-    expect(registry.ids()).toEqual([]);
+  it("the real registry holds only the checks that are built", () => {
+    // Grows as modules 10-13 land; design.md §13 caps it at seven.
+    expect(registry.ids()).toEqual(["auth"]);
+    expect(registry.ids().length).toBeLessThanOrEqual(7);
   });
 });
 
