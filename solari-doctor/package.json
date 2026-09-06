@@ -5,6 +5,9 @@
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
+  "bin": {
+    "solari-doctor": "./dist/bin.js"
+  },
   "files": [
     "dist"
   ],
