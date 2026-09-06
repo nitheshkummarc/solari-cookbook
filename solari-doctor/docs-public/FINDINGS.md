@@ -222,9 +222,11 @@ standalone client would have forced this tool to hardcode a gateway address.
 
 # 4. Bugs found while verifying solari-doctor
 
-Five defects in this tool, none of which the unit suite caught. They are
+Defects in this tool itself, none of which the unit suite caught. They are
 recorded because the pattern matters more than the individual bugs: **unit tests
-verify units, and these defects lived in the wiring between them.**
+verify units, and these defects lived in the wiring between them** — or, in the
+last two, outside the code entirely, in the CI and the documentation that
+describe it.
 
 ## 4.1 A live-environment wiring bug
 
@@ -418,6 +420,44 @@ which is the whole point of the job.
 verified: four red runs sat in the Actions tab while the local suite was green.
 The wider lesson is that "it reproduces locally" was not sufficient either —
 the local environment differed from CI in a variable nobody had enumerated.
+
+## 4.7 The documentation had drifted from the code
+
+Asked whether every document was up to date, the honest answer required an
+audit rather than an assertion. Nine claims across three internal documents were
+wrong — all of them numbers, all of them true when written.
+
+The per-suite test table summed to **352** against an actual **347**: nine
+hand-maintained numbers, each correct at the module it was written in, none
+re-derived since, and the sum never checked against the runner.
+
+| Claim | Documented | Actual |
+|:--|:--|:--|
+| Total tests | 332 | **347** |
+| `cli` suite | 46 | **33** |
+| `auth` suite | 21 | **26** |
+| `runner/errors` suite | 24 | **28** |
+| `report/bundle` suite | 16 | **19** |
+| Findings recorded | 46 | **51** |
+| Evidence-matrix rows | "~60" | **99** |
+
+**Resolved by deriving instead of remembering.** Counts now come from
+`vitest run --reporter=json`, read per file, and any number in any document must
+be reproducible from it. Thirty corrections were applied across the internal
+docs, and a matrix row now tracks the claim itself.
+
+Three flagged items were **left alone because they were correct**: the renderer
+sub-counts (13 terminal, 8 JSON) and the snapshot count, all confirmed
+per-`describe`; the *"shipped with 194 passing tests"* in [§4.1](#41-a-live-environment-wiring-bug),
+which is a historical statement rather than a current count; and the live
+workflow's `unverified` status, which is genuine — it has never been dispatched,
+and marking it verified to tidy a table would be the exact failure this project
+exists to catch.
+
+A stale number is a small error with the same shape as the large one in
+[§4.6](#46-ci-was-red-on-node-20-from-the-very-first-push): a claim that was true
+once and got carried forward without re-verification. A CI badge nobody read; a
+test count nobody re-ran. The remedy is the same — derive it, don't recall it.
 
 ---
 

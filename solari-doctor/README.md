@@ -356,6 +356,12 @@ Node 20 ships, evaluates devDependency engine ranges even under `--omit=dev`,
 while npm 11 — used in development — does not. Fixed by upgrading npm in that
 job, and every job in the workflow is now green.
 
+**The docs had drifted too.** An audit of every number in every document found
+nine wrong — a per-suite test table summing to 352 against an actual 347, each
+row correct when written and none re-derived since. Counts now come from
+`vitest --reporter=json` rather than from memory, and three flagged items were
+left alone because checking showed they were right.
+
 Full evidence, per claim, in
 [docs-public/FINDINGS.md](docs-public/FINDINGS.md).
 
