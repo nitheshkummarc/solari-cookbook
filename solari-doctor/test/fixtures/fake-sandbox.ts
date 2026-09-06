@@ -6,6 +6,7 @@
  * `kill()` ran even on a failing path.
  */
 
+import { GatewayError } from "@solarisdk/sdk";
 import type { SolariClient } from "@solarisdk/sdk";
 
 export interface CommandResultLike {
@@ -102,10 +103,13 @@ export function fakeSandboxClient(options: FakeSandboxOptions = {}): {
   return { client, calls };
 }
 
-/** A `GatewayError`-shaped rejection, for scripting a 404 after `kill()`. */
-export function gatewayError(status: number, message = "not found"): Error & { status: number } {
-  const error = new Error(message) as Error & { status: number };
-  error.name = "GatewayError";
-  error.status = status;
-  return error;
+/**
+ * A real `GatewayError`, for scripting a 404 after `kill()`.
+ *
+ * The genuine class rather than an `Error` with a `status` property: the shared
+ * error layer matches on `instanceof`, so a look-alike would be classified as
+ * an unrecognised error and the test would prove nothing (finding F39).
+ */
+export function gatewayError(status: number, message = "not found"): GatewayError {
+  return new GatewayError(status, message);
 }

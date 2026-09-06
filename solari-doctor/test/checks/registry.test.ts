@@ -86,6 +86,7 @@ describe("empty registry", () => {
       "sdk-version",
       "browser-lifecycle",
       "sandbox-command",
+      "sandbox-cleanup",
     ]);
     expect(registry.ids().length).toBeLessThanOrEqual(7);
   });
