@@ -71,11 +71,20 @@ export interface DoctorContextOptions {
 }
 
 /**
- * `browser-lifecycle` observes whether a child process exits on its own. 3s
- * matches the `deadlineMs` in design.md §5's own evidence example, and sits
- * well clear of the ~3s a healthy 0.1.3 close-and-exit actually took (F27).
+ * `browser-lifecycle` observes whether a child process exits on its own.
+ *
+ * Corrected in module 3. The earlier 3s came from the `deadlineMs: 3000` in
+ * design.md §5's evidence example, but F27 measured a *healthy* 0.1.3
+ * close-and-exit at ~3s — so a 3s deadline sat directly on top of the
+ * measured-good case and would report a working environment as hung on any
+ * slow launch, cold start, or loaded CI runner. A deadline must clear the
+ * healthy case by a real margin, not tie it.
+ *
+ * 5s is ~1.7x the measured healthy path. The failing case it must distinguish
+ * is unbounded (F27: 0.1.2 was still hung at 75s), so a larger margin costs
+ * nothing in detection power and buys tolerance for a slow machine.
  */
-const DEFAULT_CHILD_EXIT_MS = 3_000;
+const DEFAULT_CHILD_EXIT_MS = 5_000;
 
 /**
  * The cookbook README documents "poll for ~30s before giving up". That is the
