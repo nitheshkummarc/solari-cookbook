@@ -14,6 +14,7 @@ import { browserLifecycleCheck } from "./browser-lifecycle.js";
 import { sandboxCleanupCheck } from "./sandbox-cleanup.js";
 import { sandboxCommandCheck } from "./sandbox-command.js";
 import { sdkVersionCheck } from "./sdk-version.js";
+import { sessionLivenessCheck } from "./session-liveness.js";
 import type { DoctorCheck } from "../types.js";
 
 export interface CheckRegistry {
@@ -88,6 +89,7 @@ const CHECKS: readonly DoctorCheck[] = [
   browserLifecycleCheck,
   sandboxCommandCheck,
   sandboxCleanupCheck,
+  sessionLivenessCheck,
 ];
 
 export const registry: CheckRegistry = createCheckRegistry(CHECKS);

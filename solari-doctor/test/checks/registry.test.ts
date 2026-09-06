@@ -87,6 +87,7 @@ describe("empty registry", () => {
       "browser-lifecycle",
       "sandbox-command",
       "sandbox-cleanup",
+      "session-liveness",
     ]);
     expect(registry.ids().length).toBeLessThanOrEqual(7);
   });
