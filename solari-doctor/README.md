@@ -1,42 +1,10 @@
 # solari-doctor
 
-A deterministic diagnostic for documented Solari failure modes. One command,
-seven checks, no LLM in the diagnostic path.
-
-The cookbook README lists five gotchas "that cost you an afternoon if you meet
-them cold", and the open issues are largely the same problems being
-rediscovered independently. I identified a repeated developer pain point and
-built a lightweight tool that could eliminate a class of repetitive debugging
-work — telling you which of the known problems apply to your environment before
-you write real code.
-
-## Usage
-
-```bash
-npm install
-export SOLARI_API_KEY=slr_live_...   # https://console.getsolari.com
-npx solari-doctor
-```
+Checks your environment against known Solari failure modes before you hit them.
 
 ```
-solari-doctor [--json] [--full] [--explain <id>] [--report]
+$ npx solari-doctor
 
-  --json          machine-readable output on stdout
-  --full          also run expensive checks
-  --explain <id>  print the documented finding for one check
-  --report        write a sanitised report to ./solari-doctor-report.json
-```
-
-Exit `0` when everything passed, warned or was skipped; `1` when a check
-failed; `2` on a usage error. A warning exits `0` on purpose — "you are exposed
-to a documented issue" is not "your environment is broken".
-
-## What it looks like
-
-Run against a project pinned to `@solarisdk/browser` 0.1.2. This is real
-captured output, not an illustration:
-
-```
 solari-doctor
 
   + auth               the API key authenticated successfully  1.2s
@@ -64,54 +32,107 @@ diagnosis
 6 checks · 4 passed · 1 warned · 1 failed
 ```
 
-The last block is the point of the tool. `sdk-version` read a version and
-`browser-lifecycle` watched a child process — two observations that are
-inconclusive alone. Neither check knows about the other; a separate layer
-correlated them into one named cause.
+Real output from a project pinned to 0.1.2, not a constructed example. The
+`diagnosis` block is the part worth noticing: two checks that are inconclusive
+on their own — a version number and a child process that didn't exit — get
+correlated into one named cause.
 
-## The checks
+## The problem
 
-| Check | Cost | Default | What it observes |
-|---|---|---|---|
-| `auth` | free | yes | Whether the key is absent, malformed, or rejected |
-| `sdk-version` | free | yes | The installed `@solarisdk/browser` version against 0.1.3 |
-| `browser-lifecycle` | cheap | yes | Whether a process that opened a session exits on its own |
-| `sandbox-command` | cheap | yes | That commands are not shell-interpreted |
-| `sandbox-cleanup` | cheap | yes | That `close()` leaves a VM running and `kill()` ends it |
-| `session-liveness` | cheap | yes | That liveness is readable from the connection, not the status field |
-| `recording-lifecycle` | expensive | `--full` | That a replay appears after a recorded session is released |
+Every SDK has a handful of documented failure modes that cost an afternoon
+each: a key that was never fully copied, a process that hangs on exit, a VM that
+keeps running after you thought you stopped it. They're all written down
+somewhere, in a README gotcha or a GitHub issue.
 
-Checks that create real resources run through a worker pool bounded at 3, and
-every one of them kills what it created on every path — including when its own
+Nothing checks them for you, so each one gets rediscovered by hitting it in real
+code.
+
+## What it checks
+
+| Check | What it catches | Source |
+|---|---|---|
+| `auth` | A key that is missing, malformed, or rejected | [issue #1](https://github.com/solari-sdk/solari-cookbook/issues/1) |
+| `sdk-version` | `@solarisdk/browser` older than 0.1.3, where `browser.close()` alone can hang the process | [gotcha 1](../README.md#gotchas-the-examples-encode) |
+| `browser-lifecycle` | A process that opened a session and doesn't exit — observed, not inferred | [gotcha 1](../README.md#gotchas-the-examples-encode) |
+| `sandbox-command` | `run("ls -la")` looking for a binary named `ls -la`, because commands aren't shell-interpreted | [gotcha 3](../README.md#gotchas-the-examples-encode) |
+| `sandbox-cleanup` | A VM still running after `close()` — only `kill()` stops it | [gotcha 4](../README.md#gotchas-the-examples-encode) |
+| `session-liveness` | Code trusting `status` for liveness, when the status endpoint reports dead sessions as active | [issue #25](https://github.com/solari-sdk/solari-cookbook/issues/25) |
+| `recording-lifecycle` | A replay that 404s forever because `recording: true` wasn't set at creation | [gotcha 2](../README.md#gotchas-the-examples-encode) |
+
+## Usage
+
+```bash
+export SOLARI_API_KEY=slr_live_...   # https://console.getsolari.com
+npx solari-doctor
+```
+
+| Flag | |
+|---|---|
+| `--json` | machine-readable output on stdout |
+| `--full` | also run expensive checks (adds a real ~30s wait) |
+| `--explain <id>` | print the documented finding for one check |
+| `--report` | write a sanitised report to `./solari-doctor-report.json` |
+
+Exit `0` when everything passed, warned, or was skipped; `1` when a check
+failed; `2` on a usage error. A warning exits `0` — "you're exposed to a
+documented issue" isn't "your environment is broken".
+
+## Why you can trust the results
+
+Every check was verified against the real SDK, not inferred from documentation.
+Where the docs and reality disagreed, reality won and the docs got a bug report.
+
+The `sdk-version` + `browser-lifecycle` pair above is the clearest example. The
+documented claim was that the hang is fixed in 0.1.3. That was confirmed by
+running the same script against two real installs — 0.1.2 hung past 75 seconds,
+0.1.3 exited in about 3 — and the same run showed the cookbook's own TypeScript
+examples still carried the pre-0.1.3 advice. That's now
+[a separate PR](https://github.com/solari-sdk/solari-cookbook) against the
+cookbook.
+
+The tests are not the last line of defence. **Four real defects survived a green
+test suite and were caught only by running the tool against a live environment:**
+the CLI never read `SOLARI_API_KEY`; one check closed an SDK client three others
+were sharing; a unit test was quietly making live API calls; and two checks
+disagreed about whether a missing SDK was a warning or a failure. Unit tests
+verify units — the defects live in the wiring between them.
+
+Full evidence, including what remains unresolved, is in
+[docs-public/FINDINGS.md](docs-public/FINDINGS.md).
+
+## How it works
+
+```
+CLI → registry → scheduler → CheckResult[] → diagnosis → renderer
+```
+
+Checks report observations and never print. A separate pure layer correlates
+those observations into named causes — which is the only way to say "these two
+facts together mean X" without teaching every check about every other check.
+Checks that create real resources run through a worker pool bounded at three,
+and each one destroys what it created on every path, including when its own
 assertions fail.
 
-## Documentation
+Full rationale and trade-offs in [docs-public/DESIGN.md](docs-public/DESIGN.md).
 
-- [docs-public/DESIGN.md](docs-public/DESIGN.md) — architecture, the seven
-  checks, what each deliberately does not claim
-- [docs-public/FINDINGS.md](docs-public/FINDINGS.md) — what was verified about
-  the SDKs, and how
+## What this is not
+
+- **No LLM in the diagnostic path.** The same broken environment gives the same
+  answer every time. That's the whole value.
+- **No `--fix`.** It diagnoses and reports; it never mutates your project,
+  credentials, or infrastructure.
+- **Seven checks, deliberately.** Bounded to documented failure modes. An eighth
+  "because we had time" is how a focused tool stops being one.
+- **No cross-SDK claims.** The protocol document the SDK READMEs reference isn't
+  public, so this makes no claim about wire compatibility between languages.
 
 ## Development
 
 ```bash
+npm ci
 npm run check    # typecheck (src + tests), lint, tests
 npm run build
-npm test
 ```
 
-329 tests, none of which reach a live Solari service. The live integration run
-is a separate, manually triggered workflow.
-
-## Notes
-
-`recording-lifecycle` can report a timeout as inconclusive rather than as a
-failure: three live runs of the replay cycle disagreed with each other and with
-Solari's own documented figures. The check states both numbers and declines to
-claim a guarantee was breached — see
-[FINDINGS.md](docs-public/FINDINGS.md#open-and-not-blocking).
-
-A separate documentation fix for the cookbook's TypeScript examples, which still
-described the pre-0.1.3 close behaviour, is proposed upstream on the
-`fix-browser-close-example` branch. It is a distinct contribution rather than
-part of this project.
+332 tests, none of which reach a live Solari service. The live run is a separate,
+manually triggered workflow.
