@@ -9,12 +9,6 @@ export default defineConfig({
     // be reachable from `npm test`.
     exclude: ["node_modules/**", "dist/**", "scripts/**", ".venv/**"],
 
-    // Foundations land before any test does. This keeps the build green and
-    // honest ("no tests yet") rather than red, and must be revisited once the
-    // first real test exists — a suite that silently passes with zero tests is
-    // a hazard later.
-    passWithNoTests: true,
-
     environment: "node",
     restoreMocks: true,
   },
