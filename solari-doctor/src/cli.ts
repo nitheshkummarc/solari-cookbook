@@ -161,7 +161,13 @@ export async function runCli(
       ...(deps.cwd !== undefined ? { projectRoot: deps.cwd } : {}),
     });
 
-  const results = await runChecks(registry, context, { full: options.full });
+  let results;
+  try {
+    results = await runChecks(registry, context, { full: options.full });
+  } finally {
+    // One owner, one disposal, after every check has finished.
+    await context.dispose();
+  }
   const diagnoses = diagnose(results, DIAGNOSIS_RULES);
 
   io.stdout(

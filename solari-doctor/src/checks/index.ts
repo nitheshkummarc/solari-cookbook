@@ -11,6 +11,7 @@
 
 import { authCheck } from "./auth.js";
 import { browserLifecycleCheck } from "./browser-lifecycle.js";
+import { recordingLifecycleCheck } from "./recording-lifecycle.js";
 import { sandboxCleanupCheck } from "./sandbox-cleanup.js";
 import { sandboxCommandCheck } from "./sandbox-command.js";
 import { sdkVersionCheck } from "./sdk-version.js";
@@ -79,9 +80,8 @@ export function createCheckRegistry(
 /**
  * The static check list, in the order design.md §6 defines them.
  *
- * Still to arrive:
- * `sandbox-command` and `sandbox-cleanup` (12), `session-liveness` and
- * `recording-lifecycle` (13). Seven is a cap — design.md §13 forbids an eighth.
+ * All seven are now registered. design.md §13 caps the list here: an eighth
+ * check requires an explicit change to the locked scope.
  */
 const CHECKS: readonly DoctorCheck[] = [
   authCheck,
@@ -90,6 +90,7 @@ const CHECKS: readonly DoctorCheck[] = [
   sandboxCommandCheck,
   sandboxCleanupCheck,
   sessionLivenessCheck,
+  recordingLifecycleCheck,
 ];
 
 export const registry: CheckRegistry = createCheckRegistry(CHECKS);

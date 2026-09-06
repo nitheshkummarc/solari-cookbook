@@ -117,7 +117,8 @@ export const sandboxCleanupCheck: DoctorCheck = {
       return {
         id: "sandbox-cleanup",
         status: "pass",
-        message: `close() left the sandbox running; kill() ended it — ${CONSUMPTION_CAVEAT}`,
+        // Short enough for one terminal line; the caveat is in the remediation.
+        message: "close() left the sandbox running until kill() ended it",
         durationMs: 0,
         remediation: REMEDIATION,
         issueRef: "solari-cookbook#README-gotcha-4",

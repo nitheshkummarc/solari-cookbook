@@ -320,23 +320,55 @@ describe("environment wiring", () => {
     expect(JSON.parse(io.stdout)).toMatchObject({ checks: [{ status: "pass" }] });
   });
 
-  it("reaches the real auth check with a key, rather than reporting it missing", async () => {
-    const io = captureIo();
-    const code = await runCli(["--json"], {
-      io: io.io,
-      env: { SOLARI_API_KEY: "slr_live_bogus_but_present" },
+  it("hands the environment's key to the context a check receives", async () => {
+    let seen: string | undefined = "unset";
+    const registry = createCheckRegistry([
+      {
+        id: "probe",
+        description: "records the key it was given",
+        costTier: "free",
+        run: (ctx) => {
+          seen = ctx.apiKey;
+          return Promise.resolve({
+            id: "probe",
+            status: "pass" as const,
+            message: "ok",
+            durationMs: 0,
+          });
+        },
+      },
+    ]);
+
+    await runCli(["--json"], {
+      io: captureIo().io,
+      registry,
+      env: { SOLARI_API_KEY: "slr_live_from_env" },
     });
 
-    const parsed = JSON.parse(io.stdout) as { checks: Array<{ message: string }> };
-    // The key is invalid, so this fails — but it must not fail as "not set".
-    expect(code).toBe(EXIT_CHECK_FAILED);
-    expect(parsed.checks[0]?.message).not.toContain("is not set");
+    expect(seen).toBe("slr_live_from_env");
   });
 
-  it("defaults to an empty environment, so tests never read the real shell", async () => {
-    const io = captureIo();
-    await runCli(["--json"], { io: io.io });
-    const parsed = JSON.parse(io.stdout) as { checks: Array<{ message: string }> };
-    expect(parsed.checks[0]?.message).toContain("is not set");
+  it("defaults to an empty environment, so a test never reads the real shell", async () => {
+    let seen: string | undefined = "unset";
+    const registry = createCheckRegistry([
+      {
+        id: "probe",
+        description: "records the key it was given",
+        costTier: "free",
+        run: (ctx) => {
+          seen = ctx.apiKey;
+          return Promise.resolve({
+            id: "probe",
+            status: "pass" as const,
+            message: "ok",
+            durationMs: 0,
+          });
+        },
+      },
+    ]);
+
+    // No `env`, and the developer's own SOLARI_API_KEY must not leak in.
+    await runCli(["--json"], { io: captureIo().io, registry });
+    expect(seen).toBeUndefined();
   });
 });

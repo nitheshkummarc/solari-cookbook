@@ -47,6 +47,15 @@ export interface DoctorContext {
   browser(): Solari;
   sandbox(): SolariClient;
 
+  /**
+   * Releases anything the accessors constructed.
+   *
+   * Called once by the CLI after every check has finished. Checks must not
+   * close these clients themselves: the instances are shared, so the first
+   * check to finish would close the client the next one needs (finding F43).
+   */
+  dispose(): Promise<void>;
+
   readonly clock: Clock;
   readonly deadlines: Deadlines;
 }
@@ -133,6 +142,18 @@ export function createDoctorContext(
         ...(options.baseUrl !== undefined ? { baseUrl: options.baseUrl } : {}),
       });
       return browserClient;
+    },
+
+    async dispose(): Promise<void> {
+      // Optional on >= 0.1.3, where browser.close() alone releases the event
+      // loop (finding F18); it still returns the client's pool immediately.
+      try {
+        await browserClient?.close();
+      } catch {
+        // Disposal is best-effort and must not mask a check's result.
+      }
+      browserClient = undefined;
+      sandboxClient = undefined;
     },
 
     sandbox(): SolariClient {

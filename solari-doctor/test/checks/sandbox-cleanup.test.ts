@@ -74,6 +74,8 @@ describe("the locked claim (design.md §6.6)", () => {
     const text = `${result.message} ${result.remediation ?? ""}`;
 
     expect(text).toContain("may result in continued resource consumption/billing");
+    // The message stays short enough for one terminal line.
+    expect(result.message.length).toBeLessThan(80);
     expect(text).not.toMatch(/is costing you|definitely billed|you are being charged/i);
   });
 

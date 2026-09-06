@@ -154,9 +154,9 @@ describe("infrastructure failures", () => {
 });
 
 describe("the session is always cleaned up", () => {
-  it("closes the client on the passing path", async () => {
+  it("never closes the shared client — the CLI disposes of it (F43)", async () => {
     const { calls } = await runWith({ connected: [true, false] });
-    expect(calls.clientClosed).toBe(1);
+    expect(calls.clientClosed).toBe(0);
   });
 
   it("closes the session when it was never released", async () => {
@@ -168,7 +168,6 @@ describe("the session is always cleaned up", () => {
     });
 
     expect(calls.closed).toBe(1);
-    expect(calls.clientClosed).toBe(1);
   });
 
   it("does not double-release a session it already released", async () => {
@@ -177,13 +176,13 @@ describe("the session is always cleaned up", () => {
     expect(calls.released).toHaveLength(1);
   });
 
-  it("closes the client even when launch failed", async () => {
+  it("does not close the client when launch failed", async () => {
     const { calls } = await runWith({
       launch: () => {
         throw new SolariError("nope", 401);
       },
     });
-    expect(calls.clientClosed).toBe(1);
+    expect(calls.clientClosed).toBe(0);
   });
 });
 

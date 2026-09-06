@@ -141,11 +141,8 @@ export const sessionLivenessCheck: DoctorCheck = {
       } catch {
         // The check's own result stands; a failed cleanup must not replace it.
       }
-      try {
-        await solari.close();
-      } catch {
-        // Same.
-      }
+      // The client is shared and memoised; the CLI disposes of it once every
+      // check has finished (finding F43).
     }
   },
 };

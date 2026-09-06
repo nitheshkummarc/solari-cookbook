@@ -88,8 +88,10 @@ describe("empty registry", () => {
       "sandbox-command",
       "sandbox-cleanup",
       "session-liveness",
+      "recording-lifecycle",
     ]);
-    expect(registry.ids().length).toBeLessThanOrEqual(7);
+    // design.md §13 caps v1 at seven. All seven are now present.
+    expect(registry.ids()).toHaveLength(7);
   });
 });
 

@@ -148,3 +148,23 @@ describe("deadlines and optional gateway overrides", () => {
     expect(ctx.baseUrl).toBe("https://staging.example.invalid");
   });
 });
+
+describe("dispose (finding F43)", () => {
+  it("is safe to call when nothing was ever constructed", async () => {
+    await expect(createDoctorContext().dispose()).resolves.toBeUndefined();
+  });
+
+  it("is safe to call twice", async () => {
+    const ctx = createDoctorContext({ apiKey: "slr_live_test_key" });
+    ctx.sandbox();
+    await ctx.dispose();
+    await expect(ctx.dispose()).resolves.toBeUndefined();
+  });
+
+  it("drops the memoised clients, so a later call builds a fresh one", async () => {
+    const ctx = createDoctorContext({ apiKey: "slr_live_test_key" });
+    const first = ctx.sandbox();
+    await ctx.dispose();
+    expect(ctx.sandbox()).not.toBe(first);
+  });
+});
