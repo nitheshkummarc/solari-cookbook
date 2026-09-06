@@ -10,6 +10,7 @@
  */
 
 import { authCheck } from "./auth.js";
+import { sdkVersionCheck } from "./sdk-version.js";
 import type { DoctorCheck } from "../types.js";
 
 export interface CheckRegistry {
@@ -74,10 +75,10 @@ export function createCheckRegistry(
 /**
  * The static check list, in the order design.md §6 defines them.
  *
- * Still to arrive: `sdk-version` (module 10), `browser-lifecycle` (11),
+ * Still to arrive: `browser-lifecycle` (module 11),
  * `sandbox-command` and `sandbox-cleanup` (12), `session-liveness` and
  * `recording-lifecycle` (13). Seven is a cap — design.md §13 forbids an eighth.
  */
-const CHECKS: readonly DoctorCheck[] = [authCheck];
+const CHECKS: readonly DoctorCheck[] = [authCheck, sdkVersionCheck];
 
 export const registry: CheckRegistry = createCheckRegistry(CHECKS);
