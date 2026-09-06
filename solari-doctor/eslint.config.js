@@ -9,6 +9,7 @@ export default tseslint.config(
       "node_modules/**",
       "coverage/**",
       "scripts/**",
+      "ci/**",
       ".venv/**",
       "vitest.config.ts",
       "eslint.config.js",

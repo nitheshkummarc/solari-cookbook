@@ -33,5 +33,5 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "test", "scripts", ".venv"]
+  "exclude": ["node_modules", "dist", "test", "scripts", "ci", ".venv"]
 }

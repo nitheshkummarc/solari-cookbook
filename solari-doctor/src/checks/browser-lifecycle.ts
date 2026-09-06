@@ -298,6 +298,23 @@ export function createBrowserLifecycleCheck(
         case "exited": {
           const { code, closed } = report.outcome;
 
+          // The harness could not find the user's SDK. `sdk-version` reports
+          // the same condition as a warning, and the two must agree: nothing is
+          // broken, there is simply nothing here to measure.
+          if (report.childError?.name === "SdkNotFound") {
+            return {
+              ...base,
+              status: "warn",
+              message: "@solarisdk/browser is not installed in this project",
+              details: sanitizeErrorMessage(report.childError.message),
+              remediation:
+                "Install @solarisdk/browser here, or run solari-doctor from the " +
+                "project whose environment you want checked. Nothing about the " +
+                "session lifecycle can be observed without it.",
+              evidence: { ...base.evidence, sdkFound: false },
+            };
+          }
+
           if (!closed) {
             return {
               ...base,

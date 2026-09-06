@@ -1,0 +1,71 @@
+# PR gate for solari-doctor.
+#
+# Fully deterministic: no credentials, no network beyond the npm registry, and
+# no live Solari service. The mocked-SDK suite is the whole test surface here;
+# the live integration run is a separate, manually triggered workflow.
+#
+# Runs on Windows as well as Linux because `browser-lifecycle` spawns a child
+# process, and process spawning is the most platform-sensitive thing this
+# project does.
+
+name: solari-doctor CI
+
+on:
+  push:
+    branches: [main, solari-doctor]
+    paths: ["solari-doctor/**", ".github/workflows/solari-doctor-ci.yml"]
+  pull_request:
+    paths: ["solari-doctor/**", ".github/workflows/solari-doctor-ci.yml"]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: solari-doctor
+
+jobs:
+  check:
+    name: ${{ matrix.os }} · node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        # The SDK requires >= 20; 20 is the floor and 24 is what development used.
+        node: ["20", "24"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: solari-doctor/package-lock.json
+
+      # `npm ci` fails if the lockfile and manifest disagree, which is the
+      # check we want — the lockfile is part of the deliverable.
+      - run: npm ci --ignore-scripts
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+      # A build that emits nothing would pass every step above.
+      - name: Verify the CLI is runnable
+        run: node dist/bin.js --explain session-liveness
+
+      # No key is set, so this must report the missing key and exit 1 rather
+      # than crashing or reaching the network.
+      - name: Verify the no-credentials path
+        shell: bash
+        run: |
+          set +e
+          output=$(node dist/bin.js --json)
+          code=$?
+          echo "$output"
+          test "$code" -eq 1 || { echo "expected exit 1, got $code"; exit 1; }
+          echo "$output" | grep -q "SOLARI_API_KEY is not set" || {
+            echo "expected the missing-key message"; exit 1; }

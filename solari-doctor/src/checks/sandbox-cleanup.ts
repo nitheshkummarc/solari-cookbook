@@ -21,6 +21,9 @@ import type { CheckResult, DoctorCheck } from "../types.js";
 
 const SANDBOX_TIMEOUT_MS = 60_000;
 
+/** Lets `ci/cleanup.mjs` find resources a killed run left behind. */
+const CREATED_BY = "solari-doctor";
+
 /** Locked by design.md §6.6. Not to be strengthened without new evidence. */
 const CONSUMPTION_CAVEAT =
   "this may result in continued resource consumption/billing until the VM's " +
@@ -50,6 +53,8 @@ export const sandboxCleanupCheck: DoctorCheck = {
       sandbox = await client.sandboxes.create({
         template: "base",
         timeoutMs: SANDBOX_TIMEOUT_MS,
+        // Tagged so a run cancelled before `finally` can be swept afterwards.
+        metadata: { createdBy: CREATED_BY },
       });
       await sandbox.connect();
       const sandboxId = sandbox.sandboxId;

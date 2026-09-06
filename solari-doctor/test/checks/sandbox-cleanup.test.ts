@@ -235,3 +235,27 @@ describe("the check never throws", () => {
     }
   });
 });
+
+describe("created resources are tagged", () => {
+  it("marks the sandbox so a cancelled CI run can sweep it", async () => {
+    const created: unknown[] = [];
+    const { client } = fakeSandboxClient(DOCUMENTED);
+    const inner = client as unknown as {
+      sandboxes: { create: (o?: unknown) => Promise<unknown> };
+    };
+    const spy = {
+      sandboxes: {
+        ...inner.sandboxes,
+        create: async (options?: unknown) => {
+          created.push(options);
+          return inner.sandboxes.create(options);
+        },
+      },
+    } as unknown as typeof client;
+
+    const { ctx } = fakeContext({ apiKey: KEY, sandboxClient: spy });
+    await sandboxCleanupCheck.run(ctx);
+
+    expect(created[0]).toMatchObject({ metadata: { createdBy: "solari-doctor" } });
+  });
+});

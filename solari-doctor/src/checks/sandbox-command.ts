@@ -25,6 +25,9 @@ const RIGHT_ARGS = ["-la", "/tmp"] as const;
 /** Short-lived: the check needs a VM for a few seconds, not minutes. */
 const SANDBOX_TIMEOUT_MS = 60_000;
 
+/** Lets `ci/cleanup.mjs` find resources a killed run left behind. */
+const CREATED_BY = "solari-doctor";
+
 const REMEDIATION =
   "Sandbox commands are not shell-interpreted. Pass the binary as the command " +
   'and its arguments in `args` — run("ls", { args: ["-la"] }) — or invoke a ' +
@@ -50,6 +53,8 @@ export const sandboxCommandCheck: DoctorCheck = {
       sandbox = await client.sandboxes.create({
         template: "base",
         timeoutMs: SANDBOX_TIMEOUT_MS,
+        // Tagged so a run cancelled before `finally` can be swept afterwards.
+        metadata: { createdBy: CREATED_BY },
       });
       await sandbox.connect();
 

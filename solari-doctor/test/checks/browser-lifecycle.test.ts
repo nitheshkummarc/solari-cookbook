@@ -328,3 +328,32 @@ describe("the parent is always bounded", () => {
     }
   });
 });
+
+describe("a missing SDK is not a failure", () => {
+  it("warns rather than fails, matching sdk-version's verdict", async () => {
+    const h = harness();
+    const run = h.check.run(contextWith());
+    h.child.say({
+      phase: "error",
+      name: "SdkNotFound",
+      message: "@solarisdk/browser is not installed under /some/project",
+    });
+    h.child.finish(2);
+
+    const result = await run;
+    // Nothing is broken; there is simply nothing to measure. Reporting `fail`
+    // would make an unrelated directory exit 1.
+    expect(result.status).toBe("warn");
+    expect(result.message).toContain("not installed");
+    expect(result.evidence).toMatchObject({ sdkFound: false });
+  });
+
+  it("still fails for a genuine SDK error", async () => {
+    const h = harness();
+    const run = h.check.run(contextWith());
+    h.child.say({ phase: "error", name: "SolariError", message: "401 Unauthorized" });
+    h.child.finish(1);
+
+    expect((await run).status).toBe("fail");
+  });
+});
