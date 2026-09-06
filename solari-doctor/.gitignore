@@ -37,6 +37,7 @@ build/
 # Test / tooling output
 coverage/
 .nyc_output/
+.vitest/
 *.log
 npm-debug.log*
 
