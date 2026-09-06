@@ -409,9 +409,10 @@ constant except the npm version:
 does not.** Node 20 ships npm 10, while development here runs npm 11 on Node 24
 — which is exactly why the same command passed locally and failed in CI.
 
-Fixed by upgrading npm in that job. The alternative, `--engine-strict=false`,
-was rejected: `engine-strict` is the mechanism that would catch a **production**
-dependency dropping Node 20, which is the whole point of the job.
+Fixed by upgrading npm in that job, and **the workflow is now green on every
+job.** The alternative, `--engine-strict=false`, was rejected: `engine-strict`
+is the mechanism that would catch a **production** dependency dropping Node 20,
+which is the whole point of the job.
 
 *(**L4**.)* A CI badge is a claim like any other, and this one had not been
 verified: four red runs sat in the Actions tab while the local suite was green.
@@ -496,12 +497,12 @@ Measured at the current commit, not quoted from an earlier run.
 **Live checks — 7/7.** Every check was run against the real SDK before being
 considered complete, including the A/B against real 0.1.2 and 0.1.3 installs.
 
-**CI.** The PR gate runs typecheck · lint · test · build on ubuntu and windows
-across Node 22 and 24 — **all four legs green.** Node 20 is excluded from the
-gate for the reason in [§4.6](#46-ci-was-red-on-node-20-from-the-very-first-push);
-the separate `runtime-node20` job that covers the `engines.node >= 20` claim had
-its own distinct failure, now diagnosed and fixed — **that fix has not yet been
-executed by a CI run**, and is reported as pending rather than as passing.
+**CI — every job green.** The PR gate runs typecheck · lint · test · build on
+ubuntu and windows across Node 22 and 24. Node 20 is excluded from the gate for
+the reason in [§4.6](#46-ci-was-red-on-node-20-from-the-very-first-push), and is
+covered instead by a `runtime-node20` job that installs production dependencies
+only and runs the built CLI there — so the `engines.node >= 20` claim in
+`package.json` is verified rather than assumed.
 
 ---
 

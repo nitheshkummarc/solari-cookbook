@@ -354,7 +354,7 @@ That second job then failed for its own reason, and the first explanation for it
 turned out to be wrong. It took a controlled experiment to settle: npm 10, which
 Node 20 ships, evaluates devDependency engine ranges even under `--omit=dev`,
 while npm 11 — used in development — does not. Fixed by upgrading npm in that
-job; the fix is committed and awaiting its first CI run.
+job, and every job in the workflow is now green.
 
 Full evidence, per claim, in
 [docs-public/FINDINGS.md](docs-public/FINDINGS.md).
@@ -377,7 +377,7 @@ passing**, and typecheck, lint and build each exit 0.
 | Unit (vitest, mocked SDK) | Every check, the scheduler, the error mapper, the diagnosis engine and all three renderers. No test reaches a live service |
 | Runtime verification (manual, credentialed) | Each check run against the real SDK before it was considered complete, including an A/B against real 0.1.2 and 0.1.3 installs |
 | CI — PR gate | typecheck · lint · test · build, on ubuntu and windows across Node 22 and 24, with no credentials |
-| CI — Node 20 runtime | The built CLI plus production dependencies only, on Node 20 — the version `engines` claims and the dev toolchain cannot install on |
+| CI — Node 20 runtime | The built CLI plus production dependencies only, on Node 20 — the version `engines` claims and the dev toolchain cannot install on. Green |
 | CI — live | A separate workflow: secret-gated, manual dispatch plus a weekly schedule, with an always-run cleanup sweep |
 
 Two suites are mutation-verified: the concurrency bound and the `instanceof`
