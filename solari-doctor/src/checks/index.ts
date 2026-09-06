@@ -11,6 +11,7 @@
 
 import { authCheck } from "./auth.js";
 import { browserLifecycleCheck } from "./browser-lifecycle.js";
+import { sandboxCommandCheck } from "./sandbox-command.js";
 import { sdkVersionCheck } from "./sdk-version.js";
 import type { DoctorCheck } from "../types.js";
 
@@ -80,6 +81,11 @@ export function createCheckRegistry(
  * `sandbox-command` and `sandbox-cleanup` (12), `session-liveness` and
  * `recording-lifecycle` (13). Seven is a cap — design.md §13 forbids an eighth.
  */
-const CHECKS: readonly DoctorCheck[] = [authCheck, sdkVersionCheck, browserLifecycleCheck];
+const CHECKS: readonly DoctorCheck[] = [
+  authCheck,
+  sdkVersionCheck,
+  browserLifecycleCheck,
+  sandboxCommandCheck,
+];
 
 export const registry: CheckRegistry = createCheckRegistry(CHECKS);

@@ -81,7 +81,12 @@ describe("empty registry", () => {
 
   it("the real registry holds only the checks that are built", () => {
     // Grows as modules 10-13 land; design.md §13 caps it at seven.
-    expect(registry.ids()).toEqual(["auth", "sdk-version", "browser-lifecycle"]);
+    expect(registry.ids()).toEqual([
+      "auth",
+      "sdk-version",
+      "browser-lifecycle",
+      "sandbox-command",
+    ]);
     expect(registry.ids().length).toBeLessThanOrEqual(7);
   });
 });

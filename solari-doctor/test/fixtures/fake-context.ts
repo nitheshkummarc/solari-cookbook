@@ -20,6 +20,8 @@ export interface FakeContextOptions {
   clock?: Clock;
   /** Stand-in for `client.sandboxes.list`. Throw to simulate an SDK error. */
   sandboxList?: (options?: unknown) => Promise<unknown>;
+  /** A complete replacement client, for checks that do more than list. */
+  sandboxClient?: SolariClient;
   /** Called if a check requests the browser client. */
   onBrowser?: () => Solari;
 }
@@ -68,7 +70,7 @@ export function fakeContext(options: FakeContextOptions = {}): {
     },
     sandbox: () => {
       calls.sandboxRequested += 1;
-      return sandboxStub;
+      return options.sandboxClient ?? sandboxStub;
     },
   };
 
