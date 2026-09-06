@@ -1,6 +1,6 @@
 # solari-doctor
 
-[![CI](https://github.com/nitheshkummarc/solari-cookbook/actions/workflows/solari-doctor-ci.yml/badge.svg?branch=solari-doctor)](https://github.com/nitheshkummarc/solari-cookbook/actions/workflows/solari-doctor-ci.yml)
+[![CI](https://github.com/nitheshkummarc/solari-cookbook/actions/workflows/solari-doctor-ci.yml/badge.svg?branch=main)](https://github.com/nitheshkummarc/solari-cookbook/actions/workflows/solari-doctor-ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178c6)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/badge/Node-%3E%3D20-5fa04e)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
@@ -150,7 +150,7 @@ and cites its source — a cookbook gotcha or an open issue.
 Not published to npm. Clone the fork and build it:
 
 ```bash
-git clone -b solari-doctor https://github.com/nitheshkummarc/solari-cookbook.git
+git clone https://github.com/nitheshkummarc/solari-cookbook.git
 cd solari-cookbook/solari-doctor
 npm ci
 npm run build
