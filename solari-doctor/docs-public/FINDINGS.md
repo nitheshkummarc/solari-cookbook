@@ -89,9 +89,9 @@ only together do they name the documented bug.
 
 > **A stale comment in the cookbook.** The README gotcha was corrected when
 > 0.1.3 shipped, but the TypeScript examples still told readers `solari.close()`
-> was required. Fixed on the `fix-browser-close-example` branch, proposed
-> upstream as its own pull request — a documentation fix this work surfaced, not
-> part of this project.
+> was required. Fixed and open upstream as
+> [solari-cookbook#47](https://github.com/solari-sdk/solari-cookbook/pull/47) — a documentation fix this
+> work surfaced, not part of this project.
 
 ## 3.2 Authentication and the error model
 
@@ -390,12 +390,33 @@ throughout, and `npm run check` cannot fail on a constraint that only binds on
 matrix would have made the badge green and quietly abandoned the
 `engines.node >= 20` claim in `package.json`. Instead the full gate runs on Node
 22 and 24 — **all four legs now green** — and a separate `runtime-node20` job
-was added to verify the claim actually made to users, against the built output
-and production dependencies only. That job is not yet passing; see
-[§5.4](#54-the-node-20-runtime-job).
+verifies the claim actually made to users, against the built output and
+production dependencies only.
+
+### The second failure, and why the first explanation did not survive
+
+That new job then failed at its own install step, and the obvious answer — that
+`engine-strict` still evaluates vitest's range — had just been *disproved* by
+the table above. Rather than guess again, one more experiment held everything
+constant except the npm version:
+
+| npm | `npm ci --ignore-scripts --omit=dev` (same lockfile, same Node) |
+|:--|:--|
+| **11.17.0** | Succeeds — devDependency engines not evaluated |
+| **10.9.9** | **`EBADENGINE` on vitest** |
+
+**npm 10 evaluates devDependency engine ranges even under `--omit=dev`; npm 11
+does not.** Node 20 ships npm 10, while development here runs npm 11 on Node 24
+— which is exactly why the same command passed locally and failed in CI.
+
+Fixed by upgrading npm in that job. The alternative, `--engine-strict=false`,
+was rejected: `engine-strict` is the mechanism that would catch a **production**
+dependency dropping Node 20, which is the whole point of the job.
 
 *(**L4**.)* A CI badge is a claim like any other, and this one had not been
 verified: four red runs sat in the Actions tab while the local suite was green.
+The wider lesson is that "it reproduces locally" was not sufficient either —
+the local environment differed from CI in a variable nobody had enumerated.
 
 ---
 
@@ -459,22 +480,6 @@ no claim about wire compatibility.
 2. Is it available through another repository or path?
 3. Or is cross-SDK conformance intentionally outside the public surface?
 
-## 5.4 The Node 20 runtime job
-
-The `runtime-node20` job added in [§4.6](#46-ci-was-red-on-node-20-from-the-very-first-push)
-currently **fails at its install step**, `npm ci --ignore-scripts --omit=dev`.
-
-The obvious explanation — that `engine-strict` still evaluates vitest's range —
-was **tested and refuted**: with `--omit=dev`, npm does not evaluate
-devDependency engines at all, and the same command succeeds locally against the
-same lockfile. Production engine ranges all admit Node 20, and the lockfile
-format is readable by npm 10.
-
-The run logs would settle it, and the GitHub API returns **403 "Must have admin
-rights to Repository"** for job logs without an authenticated token. The cause
-is therefore **recorded as open rather than guessed at**, and the
-`engines.node >= 20` claim stays unverified in CI until it is resolved.
-
 ---
 
 # 6. Final verification summary
@@ -494,9 +499,9 @@ considered complete, including the A/B against real 0.1.2 and 0.1.3 installs.
 **CI.** The PR gate runs typecheck · lint · test · build on ubuntu and windows
 across Node 22 and 24 — **all four legs green.** Node 20 is excluded from the
 gate for the reason in [§4.6](#46-ci-was-red-on-node-20-from-the-very-first-push);
-the separate `runtime-node20` job that covers the `engines.node >= 20` claim is
-**failing, with the cause open** — see [§5.4](#54-the-node-20-runtime-job). It is
-recorded here rather than presented as passing.
+the separate `runtime-node20` job that covers the `engines.node >= 20` claim had
+its own distinct failure, now diagnosed and fixed — **that fix has not yet been
+executed by a CI run**, and is reported as pending rather than as passing.
 
 ---
 

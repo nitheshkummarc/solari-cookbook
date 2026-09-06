@@ -104,8 +104,13 @@ jobs:
           name: dist
           path: solari-doctor/dist
 
-      # No devDependencies, so vitest's engine range never applies. This still
-      # fails loudly if a production dependency stops supporting Node 20.
+      # Node 20 ships npm 10, which evaluates devDependency engine ranges even
+      # under `--omit=dev` — so `engine-strict` fails the install on vitest, a
+      # package this job does not install. npm 11 does not, and supports Node
+      # >= 20.17. Upgrading keeps `engine-strict` meaningful for the production
+      # dependencies this job is actually verifying, rather than disabling it.
+      - run: npm install -g npm@11
+
       - run: npm ci --ignore-scripts --omit=dev
 
       - name: Verify the CLI is runnable

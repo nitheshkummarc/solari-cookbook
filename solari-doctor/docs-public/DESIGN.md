@@ -406,8 +406,12 @@ of them security.
 consecutive runs had been red on one matrix leg while the local suite was green
 and the README described a matrix that had never once succeeded. The gate now
 runs on the Node versions the toolchain actually supports, and the runtime
-version claim is verified by its own job rather than assumed — a job that is
-itself still failing, and is recorded that way.
+version claim is verified by its own job rather than assumed.
+
+Diagnosing that took three passes, and only the last one held: an inference from
+strong circumstantial evidence, a local reproduction that carried an unnoticed
+second variable, and finally a controlled experiment isolating one. **"It
+reproduces locally" is not the same standard as "one variable changed."**
 
 Evidence per claim is in [`FINDINGS.md`](FINDINGS.md).
 

@@ -348,8 +348,13 @@ had been red on the Node 20 matrix leg — `vitest@5` requires
 never complete there — while the local suite was green. The gate now runs on
 Node 22 and 24, all four legs passing, and a separate job covers the
 `engines.node >= 20` claim against the built output and production dependencies
-only. That job is **not yet passing and its cause is open**; it is reported that
-way rather than removed to make the badge green.
+only, rather than dropping the claim to make the badge green.
+
+That second job then failed for its own reason, and the first explanation for it
+turned out to be wrong. It took a controlled experiment to settle: npm 10, which
+Node 20 ships, evaluates devDependency engine ranges even under `--omit=dev`,
+while npm 11 — used in development — does not. Fixed by upgrading npm in that
+job; the fix is committed and awaiting its first CI run.
 
 Full evidence, per claim, in
 [docs-public/FINDINGS.md](docs-public/FINDINGS.md).
@@ -419,9 +424,8 @@ conformance is out of scope for that reason, and three questions are open for
 the maintainers.
 
 **A related, separate contribution.** The cookbook's TypeScript examples still
-described the pre-0.1.3 close behaviour. That fix is proposed upstream on the
-`fix-browser-close-example` branch — a distinct contribution, not part of this
-project.
+described the pre-0.1.3 close behaviour. That fix is open upstream as
+[solari-cookbook#47](https://github.com/solari-sdk/solari-cookbook/pull/47) — a distinct contribution, not part of this project.
 
 ---
 
