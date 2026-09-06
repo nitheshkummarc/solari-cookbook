@@ -159,7 +159,10 @@ export SOLARI_API_KEY=slr_live_...   # from https://console.getsolari.com
 node dist/bin.js
 ```
 
-Requires Node ≥ 20. `SOLARI_API_KEY` is the only environment variable, and the
+Requires **Node ≥ 20 to run**. Building and testing from source needs **Node ≥
+22.12**, because vitest 5 does not support Node 20 — CI verifies the Node 20
+runtime claim separately, against the built output and production dependencies
+only. `SOLARI_API_KEY` is the only environment variable, and the
 run still works without it: `auth` fails, `sdk-version` still reports, and the
 checks that need the API are skipped with the reason named.
 
@@ -359,7 +362,8 @@ passing**, and typecheck, lint and build each exit 0.
 |---|---|
 | Unit (vitest, mocked SDK) | Every check, the scheduler, the error mapper, the diagnosis engine and all three renderers. No test reaches a live service |
 | Runtime verification (manual, credentialed) | Each check run against the real SDK before it was considered complete, including an A/B against real 0.1.2 and 0.1.3 installs |
-| CI — PR gate | typecheck · lint · test · build, on ubuntu and windows across Node 20 and 24, with no credentials |
+| CI — PR gate | typecheck · lint · test · build, on ubuntu and windows across Node 22 and 24, with no credentials |
+| CI — Node 20 runtime | The built CLI plus production dependencies only, on Node 20 — the version `engines` claims and the dev toolchain cannot install on |
 | CI — live | A separate workflow: secret-gated, manual dispatch plus a weekly schedule, with an always-run cleanup sweep |
 
 Two suites are mutation-verified: the concurrency bound and the `instanceof`
@@ -463,11 +467,11 @@ documentation already describes, and each one cites where it came from.
 | | |
 |---|---|
 | Language | TypeScript 6.0, strict, `exactOptionalPropertyTypes` |
-| Runtime | Node ≥ 20, ESM (the SDK is ESM-only) |
+| Runtime | Node ≥ 20 to run · ≥ 22.12 to build and test · ESM (the SDK is ESM-only) |
 | SDKs | `@solarisdk/browser`, `@solarisdk/sandbox`, `@solarisdk/sdk` — all `^0.1.3` |
 | Tests | vitest 5 |
 | Lint | ESLint 10 flat config + typescript-eslint, with layer rules enforced |
-| CI | GitHub Actions — ubuntu + windows × Node 20/24 |
+| CI | GitHub Actions — ubuntu + windows × Node 22/24, plus a Node 20 runtime job |
 
 ## License
 

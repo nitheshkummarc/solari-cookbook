@@ -32,8 +32,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        # The SDK requires >= 20; 20 is the floor and 24 is what development used.
-        node: ["20", "24"]
+        # 22 is the floor for the dev toolchain, not for the tool: vitest 5
+        # requires ^22.12 || ^24 || >=26, and .npmrc sets engine-strict, so
+        # `npm ci` cannot complete on Node 20. The >= 20 runtime claim is
+        # verified separately by the `runtime-node20` job below.
+        node: ["22", "24"]
 
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +62,55 @@ jobs:
 
       # No key is set, so this must report the missing key and exit 1 rather
       # than crashing or reaching the network.
+      - name: Verify the no-credentials path
+        shell: bash
+        run: |
+          set +e
+          output=$(node dist/bin.js --json)
+          code=$?
+          echo "$output"
+          test "$code" -eq 1 || { echo "expected exit 1, got $code"; exit 1; }
+          echo "$output" | grep -q "SOLARI_API_KEY is not set" || {
+            echo "expected the missing-key message"; exit 1; }
+
+      # The built output is what the runtime job checks on Node 20.
+      - name: Upload dist
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '24'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: solari-doctor/dist
+          retention-days: 1
+
+  # `package.json` claims engines.node >= 20, and the SDK agrees. The dev
+  # toolchain cannot install there, so the claim is verified against production
+  # dependencies and the built output instead — which is what a user installs.
+  runtime-node20:
+    name: node 20 runtime
+    needs: check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: solari-doctor/package-lock.json
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: solari-doctor/dist
+
+      # No devDependencies, so vitest's engine range never applies. This still
+      # fails loudly if a production dependency stops supporting Node 20.
+      - run: npm ci --ignore-scripts --omit=dev
+
+      - name: Verify the CLI is runnable
+        run: node dist/bin.js --explain session-liveness
+
       - name: Verify the no-credentials path
         shell: bash
         run: |
