@@ -178,17 +178,25 @@ export async function runCli(
 
   if (options.report) {
     const path = join(deps.cwd ?? process.cwd(), REPORT_FILENAME);
-    io.writeFile(
-      path,
-      renderReportBundle({
-        results,
-        diagnoses,
-        ...(context.region !== undefined ? { region: context.region } : {}),
-        ...(context.baseUrl !== undefined ? { baseUrl: context.baseUrl } : {}),
-      }),
-    );
-    // stderr, so `--json --report > out.json` leaves stdout uncorrupted.
-    io.stderr(`report written to ${path}\n`);
+    try {
+      io.writeFile(
+        path,
+        renderReportBundle({
+          results,
+          diagnoses,
+          ...(context.region !== undefined ? { region: context.region } : {}),
+          ...(context.baseUrl !== undefined ? { baseUrl: context.baseUrl } : {}),
+        }),
+      );
+      // stderr, so `--json --report > out.json` leaves stdout uncorrupted.
+      io.stderr(`report written to ${path}\n`);
+    } catch (error) {
+      // The diagnosis has already been printed and is what the run was for.
+      // Losing the report file is worth a warning, not the loss of the verdict.
+      io.stderr(
+        `could not write ${path}: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    }
   }
 
   return results.some((result) => result.status === "fail")

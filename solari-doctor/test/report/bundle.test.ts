@@ -181,3 +181,44 @@ describe("security boundary end to end", () => {
     });
   });
 });
+
+describe("hostile evidence keys", () => {
+  it("makes __proto__ an own key rather than the object's prototype", () => {
+    const hostile = JSON.parse('{"__proto__": {"polluted": "yes"}, "safe": 1}') as Record<
+      string,
+      unknown
+    >;
+    const out = sanitizeValue(hostile) as Record<string, unknown>;
+
+    // Plain assignment would have reshaped the output instead of storing a key.
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect(Object.keys(out).sort()).toEqual(["__proto__", "safe"]);
+  });
+
+  it("never pollutes Object.prototype", () => {
+    sanitizeValue(JSON.parse('{"__proto__": {"pwned": true}}'));
+    sanitizeValue(JSON.parse('{"constructor": {"prototype": {"pwned": true}}}'));
+    expect(({} as Record<string, unknown>)["pwned"]).toBeUndefined();
+  });
+
+  it("survives a hostile key through the whole bundle path", () => {
+    const rendered = renderReportBundle({
+      results: [
+        {
+          id: "x",
+          status: "pass",
+          message: "m",
+          durationMs: 0,
+          evidence: JSON.parse('{"__proto__": {"pwned": true}, "kept": 1}') as Record<
+            string,
+            unknown
+          >,
+        },
+      ],
+      diagnoses: [],
+    });
+
+    expect(JSON.parse(rendered)).toBeTruthy();
+    expect(({} as Record<string, unknown>)["pwned"]).toBeUndefined();
+  });
+});

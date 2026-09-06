@@ -90,10 +90,23 @@ export function sanitizeValue(value: unknown, depth = 0): unknown {
     const output: Record<string, unknown> = {};
     for (const [key, entry] of Object.entries(value)) {
       if (FORBIDDEN_KEYS.has(key.toLowerCase())) {
-        output[key] = "[redacted]";
+        Object.defineProperty(output, key, {
+          value: "[redacted]",
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        });
         continue;
       }
-      output[key] = sanitizeValue(entry, depth + 1);
+      // `defineProperty`, not assignment: `output["__proto__"] = x` sets the
+      // object's prototype instead of creating a key, so a hostile evidence
+      // key would silently reshape the sanitised object.
+      Object.defineProperty(output, key, {
+        value: sanitizeValue(entry, depth + 1),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
     }
     return output;
   }

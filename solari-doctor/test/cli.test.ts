@@ -372,3 +372,54 @@ describe("environment wiring", () => {
     expect(seen).toBeUndefined();
   });
 });
+
+describe("a report that cannot be written", () => {
+  const throwingIo = (io: CliIo): CliIo => ({
+    ...io,
+    writeFile: () => {
+      throw new Error("EPERM: operation not permitted");
+    },
+  });
+
+  it("keeps the exit code the checks produced", async () => {
+    const registry = createCheckRegistry([fakeCheck("auth")]);
+    const io = captureIo();
+
+    // The diagnosis has already been printed; losing the file must not turn a
+    // passing run into a usage error.
+    const code = await runCli(["--report"], {
+      io: throwingIo(io.io),
+      registry,
+      context: ctx,
+    });
+    expect(code).toBe(EXIT_OK);
+  });
+
+  it("still reports a real check failure as exit 1", async () => {
+    const registry = createCheckRegistry([
+      fakeCheck("auth", { result: { status: "fail", message: "no key" } }),
+    ]);
+    const io = captureIo();
+
+    const code = await runCli(["--report"], {
+      io: throwingIo(io.io),
+      registry,
+      context: ctx,
+    });
+    expect(code).toBe(EXIT_CHECK_FAILED);
+  });
+
+  it("warns on stderr and leaves stdout parseable", async () => {
+    const registry = createCheckRegistry([fakeCheck("auth")]);
+    const io = captureIo();
+
+    await runCli(["--json", "--report"], {
+      io: throwingIo(io.io),
+      registry,
+      context: ctx,
+    });
+
+    expect(() => JSON.parse(io.stdout)).not.toThrow();
+    expect(io.stderr).toContain("could not write");
+  });
+});

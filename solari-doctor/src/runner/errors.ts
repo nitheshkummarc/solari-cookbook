@@ -65,10 +65,24 @@ export interface MappedError {
  * depth for design.md §9.
  */
 const API_KEY_PATTERN = /slr_(?:live|test)_[A-Za-z0-9_-]+/g;
+
+/**
+ * Anything following `Bearer`, up to a quote or the end.
+ *
+ * The key pattern alone stops at the first whitespace, so a key containing a
+ * stray newline or space — a badly pasted one, which is the failure cookbook
+ * issue #1 describes — left its tail in the message. The SDK echoes the whole
+ * header when it rejects one, so that tail reached `--report`.
+ */
+const BEARER_PATTERN = /(Bearer)\s+[^"']*/gi;
+
 const MAX_MESSAGE_LENGTH = 300;
 
 export function sanitizeErrorMessage(message: string): string {
-  return message.replace(API_KEY_PATTERN, "slr_***redacted***").slice(0, MAX_MESSAGE_LENGTH);
+  return message
+    .replace(BEARER_PATTERN, "$1 ***redacted***")
+    .replace(API_KEY_PATTERN, "slr_***redacted***")
+    .slice(0, MAX_MESSAGE_LENGTH);
 }
 
 interface Mapping {

@@ -231,3 +231,28 @@ describe("optional fields follow the exactOptionalPropertyTypes convention", () 
     expect("code" in mapped.evidence).toBe(true);
   });
 });
+
+describe("a key containing whitespace is fully redacted", () => {
+  it("redacts the tail of a key split by a newline", () => {
+    // The SDK echoes the whole header when it rejects one. The key pattern
+    // alone stops at the newline, leaving the remainder exposed.
+    const sanitized = sanitizeErrorMessage(
+      'Headers.append: "Bearer slr_live_aaaa\nSECRETTAIL" is an invalid header value.',
+    );
+    expect(sanitized).not.toContain("SECRETTAIL");
+  });
+
+  it("redacts the tail of a key split by a space", () => {
+    expect(sanitizeErrorMessage("Bearer slr_live_aaa SECRETTAIL")).not.toContain("SECRETTAIL");
+  });
+
+  it("still redacts a bare key with no Bearer prefix", () => {
+    expect(sanitizeErrorMessage("failed with slr_live_aaaa_bbbb")).toContain("redacted");
+  });
+
+  it("leaves surrounding text readable", () => {
+    const sanitized = sanitizeErrorMessage('GET /x failed: "Bearer slr_live_a" is invalid');
+    expect(sanitized).toContain("GET /x failed");
+    expect(sanitized).toContain("is invalid");
+  });
+});

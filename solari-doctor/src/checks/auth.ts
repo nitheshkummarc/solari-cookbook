@@ -19,6 +19,17 @@ import type { CheckResult, DoctorCheck } from "../types.js";
 const KEY_PREFIX = "slr_live_";
 
 /**
+ * Anything an HTTP header value cannot carry: control characters and
+ * non-ASCII.
+ *
+ * A key pasted across a line break is a realistic mistake — it is the failure
+ * cookbook issue #1 describes. Without this the request fails inside `fetch`
+ * with "the control connection is not open", which points at entirely the wrong
+ * thing.
+ */
+const ILLEGAL_IN_HEADER = /[^\x09\x20-\x7E]/;
+
+/**
  * Structural facts about the key, with no part of its value.
  *
  * Length and segment count are recorded because they help diagnose a truncated
@@ -60,6 +71,26 @@ export const authCheck: DoctorCheck = {
     }
 
     const keyEvidence = describeKey(apiKey);
+
+    // Checked before the call: an invalid header value fails deep inside fetch
+    // with an error that describes the transport rather than the key.
+    if (ILLEGAL_IN_HEADER.test(apiKey)) {
+      return {
+        id: "auth",
+        status: "fail",
+        message: "SOLARI_API_KEY contains a character that cannot be sent in a header",
+        durationMs: 0,
+        details:
+          "Control characters and non-ASCII are not valid in an HTTP header " +
+          "value, so the key was never sent.",
+        remediation:
+          "The key has probably picked up a line break or stray character on " +
+          "the way in — check for a newline if it was pasted from a terminal, " +
+          "or re-copy it from console.getsolari.com.",
+        issueRef: "solari-cookbook#1",
+        evidence: { ...keyEvidence, keyHeaderSafe: false },
+      };
+    }
 
     try {
       await ctx.sandbox().sandboxes.list({ limit: 1 });

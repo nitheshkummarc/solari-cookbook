@@ -213,3 +213,54 @@ describe("the key never leaks (design.md §9)", () => {
     }
   });
 });
+
+describe("a key that cannot be sent as a header", () => {
+  const NEWLINE_KEY = ["slr_live_aaa", "bbb"].join("\n");
+
+  it("reports the character problem instead of a transport error", async () => {
+    // Without this check, fetch fails with "the control connection is not
+    // open", which points at the transport rather than the key.
+    const { ctx } = fakeContext({ apiKey: NEWLINE_KEY });
+    const result = await authCheck.run(ctx);
+
+    expect(result.status).toBe("fail");
+    expect(result.message).toContain("cannot be sent in a header");
+    expect(result.remediation).toMatch(/line break/i);
+    expect(result.evidence).toMatchObject({ keyHeaderSafe: false });
+  });
+
+  it("does not spend an API call on a key that cannot be sent", async () => {
+    const { ctx, calls } = fakeContext({ apiKey: NEWLINE_KEY });
+    await authCheck.run(ctx);
+    expect(calls.sandboxRequested).toBe(0);
+  });
+
+  it("rejects carriage returns, nulls and non-ASCII too", async () => {
+    const keys = [
+      ["slr_live_a", "b"].join(String.fromCharCode(13)),
+      ["slr_live_a", "b"].join(String.fromCharCode(0)),
+      "slr_live_ключ",
+    ];
+    for (const key of keys) {
+      const { ctx } = fakeContext({ apiKey: key });
+      expect((await authCheck.run(ctx)).message).toContain("cannot be sent in a header");
+    }
+  });
+
+  it("allows tab and space, which are legal in a header value", async () => {
+    // Over-rejecting here would fail a key the API would have accepted.
+    const legal = [
+      ["slr_live_a", "b"].join(String.fromCharCode(9)),
+      ["slr_live_a", "b"].join(" "),
+    ];
+    for (const key of legal) {
+      const { ctx } = fakeContext({ apiKey: key });
+      expect((await authCheck.run(ctx)).status).toBe("pass");
+    }
+  });
+
+  it("accepts an ordinary printable-ASCII key", async () => {
+    const { ctx } = fakeContext({ apiKey: VALID_KEY });
+    expect((await authCheck.run(ctx)).status).toBe("pass");
+  });
+});
