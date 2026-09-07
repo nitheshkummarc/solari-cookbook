@@ -65,34 +65,28 @@ clearly; they present as "the SDK is broken" or "the network is flaky".
 
 ## A real failure it catches
 
-Run in a project pinned to `@solarisdk/browser` 0.1.2. Verbatim output:
+Run against a real `@solarisdk/browser` 0.1.2 install, with the free and cheap
+checks selected. Captured output:
 
 ```
-solari-doctor
-
-  + auth               the API key authenticated successfully  1.2s
-  ! sdk-version        @solarisdk/browser 0.1.2 is older than 0.1.3  0ms
-      Upgrade to @solarisdk/browser 0.1.3 or later, where the connection-retry
-      listener is unref'd and browser.close() alone is enough to exit. Until
-      then, call await solari.close() in a finally block.
-  x browser-lifecycle  the process did not exit within 5000ms of closing the browser  7.7s
-      A process that opens a session should exit once the browser is closed. On
-      @solarisdk/browser below 0.1.3 the connection-retry listener holds the
-      event loop open; upgrade, or call await solari.close() in a finally block.
-  + sandbox-command    commands are not shell-interpreted, as documented  3.3s
-  + sandbox-cleanup    close() left the sandbox running until kill() ended it  2.3s
-  + session-liveness   isConnected() reported false once the session ended  2.1s
++ auth               the API key authenticated successfully                  928ms
+! sdk-version        @solarisdk/browser 0.1.2 is older than 0.1.3            1ms
+x browser-lifecycle  the process did not exit within 5000ms of closing       8.0s
 
 diagnosis
-
   the installed @solarisdk/browser is older than 0.1.3, and a process that
   opened a session did not exit — the documented loopback-proxy hang
-    confidence: high · from: sdk-version, browser-lifecycle · solari-cookbook#README-gotcha-1
-    Upgrade to @solarisdk/browser 0.1.3 or later, where the retry listener is
-    unref'd and browser.close() alone is enough to exit. Until then, call await
-    solari.close() in a finally block.
+    confidence: high · from: sdk-version, browser-lifecycle
+3 checks · 1 passed · 1 warned · 1 failed                                exit 1
+```
 
-6 checks · 4 passed · 1 warned · 1 failed
+For contrast, the same command against the 0.1.3 install:
+
+```
++ auth               the API key authenticated successfully                  1.0s
++ sdk-version        @solarisdk/browser 0.1.3 is at or above 0.1.3           0ms
++ browser-lifecycle  the process exited on its own after closing the browser 2.9s
+3 checks · 3 passed                                                     exit 0
 ```
 
 **Observed** — a version number, and a child process still alive five seconds
@@ -100,7 +94,7 @@ after it closed its browser.
 
 **Evidence** — `sdk-version` read `0.1.2` from the manifest in *your* project
 tree. `browser-lifecycle` spawned a real child that opened a real session,
-closed the browser, and did not exit; the parent killed it at 7.7s. A process
+closed the browser, and did not exit; the parent killed it at 8.0s. A process
 cannot credibly report its own hang, so the observation is made from outside it.
 
 **Diagnosis** — neither fact is conclusive alone. An old SDK is exposure, not a
@@ -111,12 +105,13 @@ citation.
 **Remediation** — upgrade to 0.1.3, or `await solari.close()` in a `finally`
 block until you can.
 
-The same discipline in the other direction. With no credentials set, the run is
-explicit about what it could not do rather than guessing:
+The same discipline in the other direction. With no credentials set, run from a
+directory with no SDK, the tool is explicit about what it could not do rather
+than guessing (temp path abbreviated to `<cwd>`):
 
 ```
   x auth               SOLARI_API_KEY is not set  0ms
-  ! sdk-version        @solarisdk/browser is not installed under /tmp/sd-demo  0ms
+  ! sdk-version        @solarisdk/browser is not installed under <cwd>  0ms
   - browser-lifecycle  skipped: "auth" did not pass  0ms
   - sandbox-command    skipped: "auth" did not pass  0ms
   - sandbox-cleanup    skipped: "auth" did not pass  0ms
