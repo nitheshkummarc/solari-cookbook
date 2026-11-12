@@ -56,8 +56,16 @@ jobs:
       - name: Run the checks against the live API
         env:
           SOLARI_API_KEY: ${{ secrets.SOLARI_API_KEY }}
+          # Passed through env rather than interpolated into the script, so no
+          # expression value ever becomes shell source (Semgrep
+          # run-shell-injection). Empty on scheduled runs, which have no inputs.
+          FULL: ${{ inputs.full }}
         run: |
-          node dist/bin.js ${{ inputs.full && '--full' || '' }} --report
+          if [ "$FULL" = "true" ]; then
+            node dist/bin.js --full --report
+          else
+            node dist/bin.js --report
+          fi
           echo "exit: $?"
 
       # Every check kills what it creates in a `finally`, but a cancelled job
